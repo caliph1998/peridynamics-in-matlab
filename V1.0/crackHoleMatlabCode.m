@@ -14,6 +14,11 @@ ellipse_curvature = radius_b ^ 2 / radius_a;
 radius_path = 0.08;
 % time unit
 
+%%%%%%%%%%%%%%%%%%%%
+%HERE I AM ADDING STUFF THAT IS RELATED TO DUAL HORIZON
+% #*(E$&#WOR
+%239487298472398
+%%%%%%%%%%%
 
 dt = 1;
 % Elastic modulus
