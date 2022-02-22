@@ -76,16 +76,17 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 nnum = 0; 
 coord_excess = zeros(InitialTotalNumMatPoint, 2);
 %%
-path_horizontal = [];
-path_vertical = [];
-path_circular = [];
-path_edge = [];
+%VARIABLES OF THE CRACK TIP HOLES
+tipNumOfDiv = 800;
+tip_radius = radius_a / 5;
+dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
+%dx_tip = 6.25e-04;
 %%
 %Defining the tips and the ellipse hole regions using class ellipseClass
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
-left_tip = ellipseClass((-1) * radius_a, 0, 0.005, 0.005); %if major and minor radii are equal => circle.
-right_tip = ellipseClass(radius_a, 0, 0.01, 0.01);
+left_tip = ellipseClass((-1) * radius_a, 0, tip_radius, tip_radius); %if major and minor radii are equal => circle.
+right_tip = ellipseClass(radius_a, 0, tip_radius, tip_radius);
 %%
 % coordinate generation for each material point
 for i = 1:NumofDiv_x
