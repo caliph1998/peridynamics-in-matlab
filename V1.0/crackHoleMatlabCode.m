@@ -26,9 +26,9 @@ Elastic_Modulus = 200e9; % unit: N/m^2
 % possion ratio
 Possion_ratio = 0.3;  
 %NumofDiv_x: Number of divisions in x direction
-NumofDiv_x = 100;
+NumofDiv_x = 50;
 %NumofDiv_y: Number of divisions in y direction
-NumofDiv_y = 100;
+NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
 TimeInterval = 2500;
 %Applied_pressure: Applied pressure
@@ -69,7 +69,9 @@ Volume_Horizon = pi * delta ^ 2 * thick; % The volume of the spherical horzion o
    
 
 %nullpoint = ones(InitialTotalNumMatPoint, 1);
-nodefam = zeros(60000000,3); % Total array allocated to storing the neighbors of every material point and their bondforces
+neighborsPerNode = floor(pi * delta ^ 2 / Area);
+totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode;
+nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
 
 nnum = 0; 
 coord_excess = zeros(InitialTotalNumMatPoint, 2);
