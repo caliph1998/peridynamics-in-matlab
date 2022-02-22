@@ -536,8 +536,7 @@ end
 %%
 Dongjun_hole_stress = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefam, pointfam, thick);
 %%
-%Deformed vs Undeformed Figure
-testnode = 555;
+%DEFORMED VS UNDEFORMED FIGURE
 figure(1)
 hold on
 h1=plot(coord(:,1),coord(:,2),'.r');
@@ -550,21 +549,10 @@ xlim([-0.4 0.4])
 ylim([-0.4 0.4])
 xlabel('x axis [m]');
 ylabel('y axis[m]');
-%%
-%Test point Deformed vs Undeformed position
-figure(2)
-hold on
-h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
-h2=plot(Check_time(:,1),Steady_check_y(:,1),'.g');
-legend([h1 h2],{'Displacement of x direction at blue point','Displacement of y direction at blue point'});
-ylim([-0.01 0.01])
-title({'Steady state checking'});
-xlabel('Time');
-ylabel('Displacement [m]');
 
 %%
 %DISPLACEMENT FIELD
-figure(3)
+figure(2)
 sz = 10;
 subplot(1,2,1);
 %plotting the absolute values of displacements%
@@ -582,70 +570,9 @@ ylabel('y');
 title(['U22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
 colorbar('southoutside');
 colormap('jet');
-
-
-
-%%
-%DISPLACEMENT vs MATERIAL POINTS
-figure(5)
-subplot(1,2,1);
-plot(ExtractPathData(path_horizontal, disp, 1));
-xlabel('Material Points');
-ylabel('U');
-title('U11 in the horizontal edge');
-subplot(1,2,2);
-plot(ExtractPathData(path_horizontal, disp, 2));
-xlabel('Material Points');
-ylabel('U');
-title('U22 in the horizontal edge');
-
-%%
-%DONGJUN: STRESS vs MATERIAL POINTS
-figure(6)
-subplot(1,2,1);
-plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
-xlabel('Material Points');
-ylabel('S');
-title('S11 in the horizontal edge');
-subplot(1,2,2);
-plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
-xlabel('Material Points');
-ylabel('S');
-title('S22 in the horizontal edge');
-%%
-unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
-unpunched_d = unpunched_d * (-1);
-normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
-%%
-%DONGJUN: STRESS vs NORMALIZED DISTANCE
-figure(6)
-subplot(1,2,1);
-ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
-plot(normal_path_horizontal, ssx);
-xlabel('Material Points');
-ylabel('S');
-title('S11 in the horizontal edge');
-subplot(1,2,2);
-ssy = ExtractPathData(path_horizontal, Dongjun_hole_stress, 2);
-plot(normal_path_horizontal, ssy);
-xlabel('Material Points');
-ylabel('S');
-title('S22 in the horizontal edge');
-%%
-%STRESS vs TIME
-figure(999)
-hold on
-h1 = plot(Check_time(:,1),Applied_pressure(:,1),'.k')
-h2 = plot(Check_time(:,1),Applied_pressure(:,2),'.g') 
-legend([h1 h2],{'Cross-sectional force/Unit area in the x direction at a certain point ','Cross-sectional force/Unit area in the y direction at a certain point'});
-ylim([0 6e9])
-title(sprintf('Applied pressure for a cross-sectional area in a plate\nCross Area X = -0.15, Cross Area Y = 0.20'));
-xlabel('Time');
-ylabel('Applied pressure [N/m^2]');
-
 %%
 %STRESS FIELD
-figure(44)
+figure(3)
 sz = 10;
 subplot(1,2,1);
 scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)), 'filled');
@@ -661,7 +588,59 @@ ylabel('y');
 colorbar('southoutside');
 colormap('jet');
 title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+%%
+%DONGJUN: STRESS vs NORMALIZED DISTANCE
+figure(4)
+subplot(1,2,1);
+ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
+plot(normal_path_horizontal, ssx);
+xlabel('Material Points');
+ylabel('S');
+title('S11 in the horizontal edge');
+subplot(1,2,2);
+ssy = ExtractPathData(path_horizontal, Dongjun_hole_stress, 2);
+plot(normal_path_horizontal, ssy);
+xlabel('Material Points');
+ylabel('S');
+title('S22 in the horizontal edge');
+%%
+%DONGJUN: STRESS vs MATERIAL POINTS
+figure(5)
+subplot(1,2,1);
+plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
+xlabel('Material Points');
+ylabel('S');
+title('S11 in the horizontal edge');
+subplot(1,2,2);
+plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
+xlabel('Material Points');
+ylabel('S');
+title('S22 in the horizontal edge');
+%%
+%DISPLACEMENT vs MATERIAL POINTS
+figure(6)
+subplot(1,2,1);
+plot(ExtractPathData(path_horizontal, disp, 1));
+xlabel('Material Points');
+ylabel('U');
+title('U11 in the horizontal edge');
+subplot(1,2,2);
+plot(ExtractPathData(path_horizontal, disp, 2));
+xlabel('Material Points');
+ylabel('U');
+title('U22 in the horizontal edge');
 
+%%
+%Test point Deformed vs Undeformed position
+figure(7)
+hold on
+h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
+h2=plot(Check_time(:,1),Steady_check_y(:,1),'.g');
+legend([h1 h2],{'Displacement of x direction at blue point','Displacement of y direction at blue point'});
+ylim([-0.01 0.01])
+title({'Steady state checking'});
+xlabel('Time');
+ylabel('Displacement [m]');
 %%
 function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCorrFactor_dilatation] = Calculate_SurCorrection(delta,VolCorr_radius,bcs,bcd,Volume,SED_analytical_distorsion,SED_analytical_dilatation,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord)
 
