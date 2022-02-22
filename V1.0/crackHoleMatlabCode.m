@@ -172,7 +172,28 @@ true_stress_normal = zeros(TotalNumMatPoint,2); %Peridynamic true normal stress 
 liu_stress_normal = zeros(TotalNumMatPoint,2); %Peridynamic normal stress calculated by Liu method
 %failm = zeros(TotalNumMatPoint, maxfam);
 
-
+%% NEW NEIGHBOR DEFNITIONS
+neighbors = zeros(TotalNumMatPoint, neighborsPerNode);
+neighborsIter = ones(TotalNumMatPoint, 1);
+dualNeighbors = zeros(TotalNumMatPoint, neighborsPerNode);
+dualIter = ones(TotalNumMatPoint, 1);
+for i = 1:TotalNumMatPoint
+    
+    for j = 1:TotalNumMatPoint
+        RelativePosition_Vector = sqrt((coord(j,1) - coord(i,1))^2 + (coord(j,2) - coord(i,2))^2);
+        if(i~=j) 
+            if(RelativePosition_Vector <= Deltas(i, 1))
+            neighbors(i, neighborsIter(i,1)) = j;
+            neighborsIter(i,1) = neighborsIter(i,1) + 1;
+            if(RelativePosition_Vector > Deltas(j, 1))
+                dualNeighbors(j, dualIter(j, 1)) = i;
+                dualIter(j, 1) = dualIter(j, 1) + 1;
+            end
+            end
+        end
+    end
+end
+%%
 
 % coordinate displays with horizon families
 for i = 1:TotalNumMatPoint
