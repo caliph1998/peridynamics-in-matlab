@@ -82,6 +82,7 @@ tip_radius = radius_a / 5;
 dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
 %dx_tip = 6.25e-04;
 %%
+path_horizontal = [];
 %Defining the tips and the ellipse hole regions using class ellipseClass
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
@@ -107,15 +108,6 @@ for i = 1:NumofDiv_x
       if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
           path_horizontal(end+1) = nnum + 1;
       end
-      if ( abs(coordx) <= dx && coordy >= 0)
-          path_vertical(end+1) = nnum + 1;
-      end
-      if ( (coordy - coordx) <= dx && coordy >= 0) %Not sure if there should be an absolute or not.
-          path_edge(end+1) = nnum + 1;
-      end
-      if ( abs(coordx ^ 2 + coordy ^ 2 - radius_path ^ 2) <= dx ^ 2)
-          path_circular(end+1) = nnum + 1;
-      end
       nnum = nnum + 1;
       coord_excess(nnum,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
       coord_excess(nnum,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
@@ -124,7 +116,25 @@ for i = 1:NumofDiv_x
 end
 
 %%
-TotalNumMatPoint = nnum;
+coord = coord_excess(1:nnum, :); %coord: Material point locations
+% get_circle(X, Y, R, dx, mid_circle)
+%%
+%EXTRACTING COORDINATES OF THE CRACK TIP LOCAL MATERIAL
+%POINTS FROM get_circle AND IMPORTING THEM INTO COORD
+%seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dx_tip, center_hole);
+%seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dx_tip, center_hole);
+%coord = [coord; seedLeft; seedRight];
+
+S = size(coord); %THE TOTAL NUMBER OF MATERIAL POINTS HAS TO BE UPDATED
+TotalNumMatPoint = S(1);
+%%
+Deltas = zeros(TotalNumMatPoint, 1);
+for i = 1: nnum
+    Deltas(i, 1) = delta;
+end
+for i = nnum+1: TotalNumMatPoint
+    Deltas(i, 1) = 3.015 * dx_tip;
+end
 
 %left = zeros(TotalNumMatPoint,2);
 %%
@@ -135,14 +145,12 @@ forceRN = zeros(TotalNumMatPoint,2);
 forceLP = zeros(TotalNumMatPoint,2);
 forceLN = zeros(TotalNumMatPoint,2);
 %% Definition of needed arrays (coord_excess is trimmed at this stage)
-coord = coord_excess(1:TotalNumMatPoint, :); %coord: Material point locations
 numfam = zeros(TotalNumMatPoint,1); %numfam: Number of family nodes
 pointfam = zeros(TotalNumMatPoint,1); %pointfam: Pointer
 PDforce = zeros(TotalNumMatPoint,2);%PDforce: Peridynamic force
 BodyForce = zeros(TotalNumMatPoint,2);%Body force
 %%
 path_horizontal = SortPath('hor',path_horizontal, coord); %Sorting horizontal path from head to tail of the path
-path_vertical = SortPath('ver',path_vertical, coord);
 %path_edge = SortPath('edge',path_edge, coord);
 %path_circular = SortPath('circle',path_circular, coord);
 %%
