@@ -275,7 +275,7 @@ for i = 1:TotalNumMatPoint
 end
 %%
 
-testNode = 555;
+
 
 
 %%%% Time Interval starts for computing displament of each material point %%% 
