@@ -457,6 +457,10 @@ end
 % 50*40 +(25+12) = 2037
 %%
 Dongjun_hole_stress = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefam, pointfam, thick);
+unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
+unpunched_d = unpunched_d * (-1);
+normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
+testnode = 3000;
 %%
 %DEFORMED VS UNDEFORMED FIGURE
 figure(1)
