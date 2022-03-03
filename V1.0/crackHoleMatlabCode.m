@@ -327,9 +327,8 @@ time = tt
         end
     end
 
+PDforce = zeros(TotalNumMatPoint, 2);
 for i = 1:TotalNumMatPoint
-    PDforce(i,1) = 0;
-    PDforce(i,2) = 0;
     for j = 1:numfam(i,1)
     cnode = nodefam(pointfam(i,1)+j-1,1); %cnode: the current neighbor node/material-point.
     RelativePosition_Vector = sqrt((coord(cnode,1) - coord(i,1))^2 + (coord(cnode,2) - coord(i,2))^2); %the initial distance
