@@ -18,7 +18,7 @@ Elastic_Modulus = 200e9; % unit: N/m^2
 % possion ratio
 Possion_ratio = 0.3;  
 %NumofDiv_x: Number of divisions in x direction
-NumofDiv_x = 50;
+NumofDiv_x = 100;
 %NumofDiv_y: Number of divisions in y direction
 NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
@@ -377,18 +377,20 @@ for i = 1:TotalNumMatPoint
 %For points with smaller horizon, this doesn't make a difference, but it
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
-        bondForce_const = (2 * bcd*delta * alpha / RelativePosition_Vector * Directional_cosine * (PD_SED_dilatation_Fixed(i,1) + ...
-                      PD_SED_dilatation_Fixed(cnode,1)) + ...
-                      4 * bcs*delta * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
+        bondForce_const = (2 * bcd*delta * alpha / RelativePosition_Vector * Directional_cosine * (PD_SED_dilatation_Fixed(i,1))  + ...
+                      2 * bcs*delta * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
         %The point of the two lines below is to split the force vector into its components.
         %But it needs to be divided by RelativeDisp_Vector which is done in
         %the above line which is unclear and confusing.
         BondForce_x =  (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * bondForce_const ;           
         BondForce_y =  (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * bondForce_const ;           
-        BondForce = (BondForce_x ^ 2 + BondForce_y ^ 2) ^ 0.5; %exactly the same as bondForce_const => Pointless!
         
         PDforce(i,1) = PDforce(i,1) + BondForce_x;     
         PDforce(i,2) = PDforce(i,2) + BondForce_y;
+                
+        PDforce(cnode,1) = PDforce(cnode,1) - BondForce_x;     
+        PDforce(cnode,2) = PDforce(cnode,2) - BondForce_y;
+        
         nodefam(pointfam(i,1)+j-1,2) = BondForce_x;
         nodefam(pointfam(i,1)+j-1,3) = BondForce_y;
     end
