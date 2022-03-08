@@ -52,11 +52,7 @@ Volume = Area * thick; % unit: m^3
 % PD material parameter
 bcd = 2/(pi*thick*delta^3);
 % PD material Parameter
-bcs = 6*Shear_Modulus/(pi*thick*delta^4);
-% Classical strain energy for dilatation
-SED_analytical_dilatation = 0.001;
-% PD strain energy for distorsion=
-SED_analytical_distorsion = 1 / (2*(1 - Possion_ratio*Possion_ratio)) * (Elastic_Modulus) * (0.001)^2 - alpha * (0.001)^2; 
+bcs = 6*Shear_Modulus/(pi*thick*delta^4); 
 Volume_Horizon = pi * delta ^ 2 * thick; % The volume of the spherical horzion of each material point
    
 
@@ -121,11 +117,17 @@ S = size(coord); %THE TOTAL NUMBER OF MATERIAL POINTS HAS TO BE UPDATED
 TotalNumMatPoint = S(1);
 %%
 Deltas = zeros(TotalNumMatPoint, 1);
+BCS = zeros(TotalNumMatPoint, 1);
+BCD = zeros(TotalNumMatPoint, 1);
 for i = 1: nnum
     Deltas(i, 1) = delta;
+    BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
+    BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
 for i = nnum+1: TotalNumMatPoint
     Deltas(i, 1) = 3.015 * dx_tip;
+    BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
+    BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
 
 %% Definition of needed arrays (coord_excess is trimmed at this stage)
@@ -159,8 +161,6 @@ Steady_check_y = zeros(TimeInterval,1);
 %% NEW NEIGHBOR DEFNITIONS
 neighbors = zeros(TotalNumMatPoint, neighborsPerNode);
 neighborsIter = ones(TotalNumMatPoint, 1);
-dualNeighbors = zeros(TotalNumMatPoint, neighborsPerNode);
-dualIter = ones(TotalNumMatPoint, 1);
 for i = 1:TotalNumMatPoint
     
     for j = 1:TotalNumMatPoint
@@ -169,10 +169,6 @@ for i = 1:TotalNumMatPoint
             if(RelativePosition_Vector <= Deltas(i, 1))
             neighbors(i, neighborsIter(i,1)) = j;
             neighborsIter(i,1) = neighborsIter(i,1) + 1;
-            if(RelativePosition_Vector > Deltas(j, 1))
-                dualNeighbors(j, dualIter(j, 1)) = i;
-                dualIter(j, 1) = dualIter(j, 1) + 1;
-            end
             end
         end
     end
@@ -181,7 +177,8 @@ end
 
 % coordinate displays with horizon families
 for i = 1:TotalNumMatPoint
-
+    
+    delta = Deltas(i,1);
     if (i == 1) 
     pointfam(i,1) = 1;
     else
@@ -207,13 +204,13 @@ disp(i,2) = 0.0;
 end
 
 %%Surface correction factor calculation - function%%
-[PD_SED_distorsion(:,1),SurCorrFactor_distorsion(:,1),PD_SED_dilatation(:,1), SurCorrFactor_dilatation(:,1)] = Calculate_SurCorrection(delta,VolCorr_radius,bcs,bcd,Volume,SED_analytical_distorsion,SED_analytical_dilatation,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord);
+[PD_SED_distorsion(:,1),SurCorrFactor_distorsion(:,1),PD_SED_dilatation(:,1), SurCorrFactor_dilatation(:,1)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord);
     
 for i = 1:TotalNumMatPoint
     disp(i,1) = 0;
     disp(i,2) = 0.001 * coord(i,2);
 end
-[PD_SED_distorsion(:,2), SurCorrFactor_distorsion(:,2),PD_SED_dilatation(:,2), SurCorrFactor_dilatation(:,2)] = Calculate_SurCorrection(delta,VolCorr_radius,bcs,bcd,Volume,SED_analytical_distorsion,SED_analytical_dilatation,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord);
+[PD_SED_distorsion(:,2), SurCorrFactor_distorsion(:,2),PD_SED_dilatation(:,2), SurCorrFactor_dilatation(:,2)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord);
 %Surface correction factor calculation - end
     
 %initial displacemeTimeInterval
@@ -225,6 +222,10 @@ end
 
 %Stable mass vector computation
 for i = 1:TotalNumMatPoint
+    delta = Deltas(i,1);
+    dx = Deltas(i,1) / 3.015;
+    thick = dx;
+    bcs = BCS(i,1);
 massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / dx * 5;
 massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / dx * 5;
 end
@@ -280,11 +281,7 @@ testNode = 555;
 
 %%%% Time Interval starts for computing displament of each material point %%% 
 for tt = 1:TimeInterval
-ctime = tt * dt;
 time = tt
-
-    dforce_x_Sum = 0;
-    dforce_y_Sum = 0;
     
     for i = 1:TotalNumMatPoint
     PD_SED_dilatation_Fixed(i,1) = 0;
@@ -315,12 +312,12 @@ time = tt
 
             SurCorrFactor_x = (SurCorrFactor_dilatation(i,1) + SurCorrFactor_dilatation(cnode,1))/2;
             SurCorrFactor_y = (SurCorrFactor_dilatation(i,2) + SurCorrFactor_dilatation(cnode,2))/2;
-            SurCorrFactor_Arbitrary_distorsion = 1 / (((cos(theta))^2/(SurCorrFactor_x)^2) + ((sin(theta))^2 / (SurCorrFactor_y)^2));
-            SurCorrFactor_Arbitrary_distorsion = sqrt(SurCorrFactor_Arbitrary_distorsion);
+            SurCorrFactor_Arbitrary_dilatation = 1 / (((cos(theta))^2/(SurCorrFactor_x)^2) + ((sin(theta))^2 / (SurCorrFactor_y)^2));
+            SurCorrFactor_Arbitrary_dilatation = sqrt(SurCorrFactor_Arbitrary_dilatation);
 
             %Critic stretch if statement is deactivated as it is unused
             %if (failm(i,j)==1) 
-            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + bcd * delta * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_distorsion * fac;                          
+            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + bcd * delta * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
             %else
             %PD_SED_dilatation_Fixed(i,1) = 0;
             %end                                             
@@ -361,10 +358,6 @@ for i = 1:TotalNumMatPoint
         SurCorrFactor_Arbitrary_distorsion = sqrt(SurCorrFactor_Arbitrary_distorsion);
         %Note: same variable SurCorrFactor_x and SurCorrFactor_y are used
         %to hold two different concepts as variables.
-        SurCorrFactor_x = (SurCorrFactor_dilatation(i,1) + SurCorrFactor_dilatation(cnode,1)) / 2;
-        SurCorrFactor_y = (SurCorrFactor_dilatation(i,2) + SurCorrFactor_dilatation(cnode,2)) / 2;
-        SurCorrFactor_Arbitrary_dilatation = 1 / (((cos(theta))^2 / (SurCorrFactor_x)^2) + ((sin(theta))^2 / (SurCorrFactor_y)^2));
-        SurCorrFactor_Arbitrary_dilatation = sqrt(SurCorrFactor_Arbitrary_dilatation);
 % bcd = d in Madenci; bcs: b in Madenci; PD_SED_dilatation_Fixed: thetha_k
 % in madenci; SurCorrFactor_Arbitrary_dilation: Gd in Madenci;
 % SurCorrFactor_Arbitrary_distorction: Gb in Madenci; Directional_cosine:
@@ -382,17 +375,19 @@ for i = 1:TotalNumMatPoint
         %The point of the two lines below is to split the force vector into its components.
         %But it needs to be divided by RelativeDisp_Vector which is done in
         %the above line which is unclear and confusing.
-        BondForce_x =  (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * bondForce_const ;           
-        BondForce_y =  (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * bondForce_const ;           
+        directForce_x =  (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * bondForce_const ;           
+        directForce_y =  (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * bondForce_const ;           
         
-        PDforce(i,1) = PDforce(i,1) + BondForce_x;     
-        PDforce(i,2) = PDforce(i,2) + BondForce_y;
-                
-        PDforce(cnode,1) = PDforce(cnode,1) - BondForce_x;     
-        PDforce(cnode,2) = PDforce(cnode,2) - BondForce_y;
+        PDforce(i,1) = PDforce(i,1) + directForce_x;     
+        PDforce(i,2) = PDforce(i,2) + directForce_y;
         
-        nodefam(pointfam(i,1)+j-1,2) = BondForce_x;
-        nodefam(pointfam(i,1)+j-1,3) = BondForce_y;
+        reactionaryForce_x = (-1) * directForce_x;
+        reactionaryForce_y = (-1) * directForce_y;
+        PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
+        PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
+        
+        nodefam(pointfam(i,1)+j-1,2) = directForce_x;
+        nodefam(pointfam(i,1)+j-1,3) = directForce_y;
     end
 end
 
@@ -569,8 +564,19 @@ title({'Steady state checking'});
 xlabel('Time');
 ylabel('Displacement [m]');
 %%
-function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCorrFactor_dilatation] = Calculate_SurCorrection(delta,VolCorr_radius,bcs,bcd,Volume,SED_analytical_distorsion,SED_analytical_dilatation,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord)
-
+function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCorrFactor_dilatation] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord)
+        Elastic_Modulus = 200e9; % unit: N/m^2
+        % Classical strain energy for dilatation
+        SED_analytical_dilatation = 0.001;
+        % PD strain energy for distorsion=
+        Possion_ratio = 0.3;  
+        Shear_Modulus = Elastic_Modulus / (2 * (1 + Possion_ratio)); 
+        % bulk modulus % unit: N/m^2
+        Bulk_Modulus = Elastic_Modulus / (2 * (1 - Possion_ratio)); 
+        % PD material parameter
+        alpha=0.5*(Bulk_Modulus-2*Shear_Modulus);
+        SED_analytical_distorsion = 1 / (2*(1 - Possion_ratio*Possion_ratio)) * (Elastic_Modulus) * (0.001)^2 - alpha * (0.001)^2; 
+        
         PD_SED_distorsion = zeros(TotalNumMatPoint,1);
         SurCorrFactor_distorsion = zeros(TotalNumMatPoint,1);
         PD_SED_dilatation = zeros(TotalNumMatPoint,1);
@@ -586,6 +592,8 @@ function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCor
         Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1));
         Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
         Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
+        delta = Deltas(i,1);
+        VolCorr_radius = Deltas(j,1) / 3.015 / 2;
             if (RelativePosition_Vector <= delta-VolCorr_radius)
             fac = 1;
             elseif (RelativePosition_Vector <= delta+VolCorr_radius)
@@ -593,6 +601,9 @@ function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCor
             else
             fac = 0;
             end
+        Volume = (Deltas(j,1) / 3.015) ^ 3;
+        bcs = BCS(i,1);
+        bcd = BCD(i,1);
         PD_SED_distorsion(i,1) = PD_SED_distorsion(i,1) + bcs*delta * (Stretch^2) * (RelativePosition_Vector) * Volume * fac;
         PD_SED_dilatation(i,1) = PD_SED_dilatation(i,1) +  bcd * delta * Stretch * Directional_cosine * Volume * fac;
         end
