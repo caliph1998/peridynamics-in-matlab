@@ -174,6 +174,25 @@ for i = 1:TotalNumMatPoint
     end
 end
 %%
+%% DEMONSTRATION OF NEIGHBORS
+node = 1346;
+sz = 50;
+figure(66)
+hold on
+xlabel('x');
+ylabel('y');
+title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
+scatter(coord(:,1), coord(:,2), '.g');
+for j = 1:numfam(node,1)
+    cnode = nodefam(pointfam(node,1)+j-1,1);
+    scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
+end
+
+scatter(coord(node, 1), coord(node, 2), sz, '.b');
+hold off
+%%
+
+%%
 
 % coordinate displays with horizon families
 for i = 1:TotalNumMatPoint
