@@ -22,7 +22,7 @@ NumofDiv_x = 50;
 %NumofDiv_y: Number of divisions in y direction
 NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
-TimeInterval = 525;
+TimeInterval = 1500;
 %Applied_pressure: Applied pressure
 Applied_pressure = 500e7; % unit: N/m^2
 % total number of material point
@@ -68,6 +68,7 @@ coord_excess = zeros(InitialTotalNumMatPoint, 2);
 tipNumOfDiv = 800;
 tip_radius = radius_a / 5;
 dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
+dx_tip = dx / 10;
 %dx_tip = 6.25e-04;
 %%
 path_horizontal = [];
@@ -86,7 +87,7 @@ for i = 1:NumofDiv_x
       %Applying the hole in the plate (can be deactivated by commenting the
       %if statement below%
       
-      if (center_hole.inEllipse(coordx, coordy))
+      if (center_hole.inEllipse(coordx, coordy) || left_tip.inEllipse(coordx, coordy) || right_tip.inEllipse(coordx, coordy))
           continue
           %nullpoint(nnum,1) = 0;
       end
@@ -109,9 +110,9 @@ coord = coord_excess(1:nnum, :); %coord: Material point locations
 %%
 %EXTRACTING COORDINATES OF THE CRACK TIP LOCAL MATERIAL
 %POINTS FROM get_circle AND IMPORTING THEM INTO COORD
-%seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dx_tip, center_hole);
-%seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dx_tip, center_hole);
-%coord = [coord; seedLeft; seedRight];
+seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dx_tip, center_hole);
+seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dx_tip, center_hole);
+coord = [coord; seedLeft; seedRight];
 
 S = size(coord); %THE TOTAL NUMBER OF MATERIAL POINTS HAS TO BE UPDATED
 TotalNumMatPoint = S(1);
@@ -176,7 +177,7 @@ for i = 1:TotalNumMatPoint
 end
 %%
 %% DEMONSTRATION OF NEIGHBORS
-node = 1346;
+node = 2500;
 sz = 50;
 figure(66)
 hold on
@@ -489,7 +490,6 @@ Dongjun_hole_stress = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,node
 unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
 unpunched_d = unpunched_d * (-1);
 normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
-testnode = 3000;
 %%
 %DEFORMED VS UNDEFORMED FIGURE
 figure(1)
@@ -592,7 +592,7 @@ hold on
 h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
 h2=plot(Check_time(:,1),Steady_check_y(:,1),'.g');
 legend([h1 h2],{'Displacement of x direction at blue point','Displacement of y direction at blue point'});
-ylim([-0.01 0.01])
+%ylim([-0.01 0.01])
 title({'Steady state checking'});
 xlabel('Time');
 ylabel('Displacement [m]');
