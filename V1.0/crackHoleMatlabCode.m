@@ -18,11 +18,11 @@ Elastic_Modulus = 200e9; % unit: N/m^2
 % possion ratio
 Possion_ratio = 0.3;  
 %NumofDiv_x: Number of divisions in x direction
-NumofDiv_x = 100;
+NumofDiv_x = 50;
 %NumofDiv_y: Number of divisions in y direction
 NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
-TimeInterval = 2500;
+TimeInterval = 525;
 %Applied_pressure: Applied pressure
 Applied_pressure = 500e7; % unit: N/m^2
 % total number of material point
@@ -126,6 +126,7 @@ for i = 1: nnum
 end
 for i = nnum+1: TotalNumMatPoint
     Deltas(i, 1) = 3.015 * dx_tip;
+    thick = dx_tip;
     BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
     BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
@@ -245,8 +246,7 @@ end
 %Stable mass vector computation
 for i = 1:TotalNumMatPoint
     delta = Deltas(i,1);
-    dx = Deltas(i,1) / 3.015;
-    thick = dx;
+    thick = Deltas(i,1) / 3.015;
     bcs = BCS(i,1);
 massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / dx * 5;
 massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / dx * 5;
@@ -316,6 +316,8 @@ time = tt
          Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1));
          Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
          Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
+         delta = Deltas(i,1);
+         VolCorr_radius = Deltas(j,1) / 3.015 / 2;
             if (RelativePosition_Vector <= delta-VolCorr_radius) 
             fac = 1;
             elseif (RelativePosition_Vector <= delta+VolCorr_radius)
@@ -339,6 +341,9 @@ time = tt
 
             %Critic stretch if statement is deactivated as it is unused
             %if (failm(i,j)==1) 
+            Volume = (Deltas(i,1) / 3.015) ^ 3;
+            bcs = BCS(i,1);
+            bcd = BCD(i,1);
             PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + bcd * delta * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
             %else
             %PD_SED_dilatation_Fixed(i,1) = 0;
@@ -358,7 +363,10 @@ for i = 1:TotalNumMatPoint
     AbsoluteValue_x_y = RelativeDisp_Vector * RelativePosition_Vector;
     Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1)); %(C'x - Cx)(Cx-Ax)
     Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2)); %(C'y - Cy)(Cy-Ay)
-        Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y; %Some weird constant that will be used in bond_constant calculations.
+        Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;%Some weird constant that will be used in bond_constant calculations.
+        
+        delta = Deltas(i,1);
+        VolCorr_radius = Deltas(j,1) / 3.015 / 2;
         if (RelativePosition_Vector <= delta-VolCorr_radius) %if all the way inside the horizon
          fac = 1;
         elseif (RelativePosition_Vector <= delta+VolCorr_radius) %if partially inside the A horizon
@@ -392,6 +400,9 @@ for i = 1:TotalNumMatPoint
 %For points with smaller horizon, this doesn't make a difference, but it
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
+        Volume = (Deltas(j,1) / 3.015) ^ 3;
+        bcs = BCS(i,1);
+        bcd = BCD(i,1);
         bondForce_const = (2 * bcd*delta * alpha / RelativePosition_Vector * Directional_cosine * (PD_SED_dilatation_Fixed(i,1))  + ...
                       2 * bcs*delta * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
         %The point of the two lines below is to split the force vector into its components.
