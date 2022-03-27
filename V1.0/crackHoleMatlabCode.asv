@@ -22,7 +22,7 @@ NumofDiv_x = 50;
 %NumofDiv_y: Number of divisions in y direction
 NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
-TimeInterval = 10000;
+TimeInterval = 3000;
 %Applied_pressure: Applied pressure
 Applied_pressure = 500e7; % unit: N/m^2
 % total number of material point
@@ -68,7 +68,7 @@ coord_excess = zeros(InitialTotalNumMatPoint, 2);
 tipNumOfDiv = 800;
 tip_radius = radius_a / 5;
 dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
-dx_tip = dx / 10;
+dx_tip = dx / 2;
 %dx_tip = 6.25e-04;
 %%
 path_horizontal = [];
@@ -76,7 +76,7 @@ path_horizontal = [];
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
 left_tip = ellipseClass((-1) * radius_a, 0, tip_radius, tip_radius); %if major and minor radii are equal => circle.
-right_tip = ellipseClass(0.20, 0, tip_radius, tip_radius);
+right_tip = ellipseClass(radius_a, 0, tip_radius, tip_radius);
 %%
 % coordinate generation for each material point
 for i = 1:NumofDiv_x
@@ -177,7 +177,7 @@ for i = 1:TotalNumMatPoint
 end
 %%
 %% DEMONSTRATION OF NEIGHBORS
-node = 2496;
+node = 2700;
 sz = 50;
 figure(66)
 hold on
@@ -299,9 +299,7 @@ for i = 1:TotalNumMatPoint
 end
 %%
 
-%testNode = 555;
-testCoordinates = [-0.05, -0.01];
-testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord, center_hole, left_tip, right_tip, nnum);
+testNode = 2700;
 
 
 %%%% Time Interval starts for computing displament of each material point %%% 
