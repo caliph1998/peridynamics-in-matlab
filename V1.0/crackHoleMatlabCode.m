@@ -18,7 +18,7 @@ Elastic_Modulus = 200e9; % unit: N/m^2
 % possion ratio
 Possion_ratio = 0.3;  
 %NumofDiv_x: Number of divisions in x direction
-NumofDiv_x = 50;
+NumofDiv_x = 100;
 %NumofDiv_y: Number of divisions in y direction
 NumofDiv_y = NumofDiv_x;
 %TimeInterval: Number of time iTimeIntervalervals
@@ -66,9 +66,9 @@ coord_excess = zeros(InitialTotalNumMatPoint, 2);
 %%
 %VARIABLES OF THE CRACK TIP HOLES
 tipNumOfDiv = 800;
-tip_radius = radius_a / 5;
+tip_radius = radius_a / 5 * 3;
 dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
-dx_tip = dx / 10;
+dx_tip = dx / 2;
 %dx_tip = 6.25e-04;
 %%
 path_horizontal = [];
@@ -249,8 +249,8 @@ for i = 1:TotalNumMatPoint
     delta = Deltas(i,1);
     thick = Deltas(i,1) / 3.015;
     bcs = BCS(i,1);
-massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / dx * 5;
-massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / dx * 5;
+massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / thick * 5;
+massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / thick * 5;
 end
 
 %%
