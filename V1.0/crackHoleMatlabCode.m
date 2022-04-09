@@ -127,7 +127,8 @@ for i = 1: nnum
 end
 for i = nnum+1: TotalNumMatPoint
     Deltas(i, 1) = 3.015 * dx_tip;
-    thick = dx_tip;
+    %thick = dx_tip;
+    thick = dx;
     BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
     BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
@@ -177,7 +178,7 @@ for i = 1:TotalNumMatPoint
 end
 %%
 %% DEMONSTRATION OF NEIGHBORS
-node = 2496;
+node = 9990;
 sz = 50;
 figure(66)
 hold on
@@ -247,10 +248,11 @@ end
 %Stable mass vector computation
 for i = 1:TotalNumMatPoint
     delta = Deltas(i,1);
-    thick = Deltas(i,1) / 3.015;
+    %thick = Deltas(i,1) / 3.015;
+    DX = Deltas(i,1) / 3.015;
     bcs = BCS(i,1);
-massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / thick * 5;
-massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / thick * 5;
+massvec(i,1) = 0.25 * dt * dt * (pi * (delta)^2 * thick)  * bcs / DX * 5;
+massvec(i,2) = 0.25 * dt * dt * (pi * (delta)^2 * thick) * bcs / DX * 5;
 end
 
 %%
@@ -320,7 +322,7 @@ time = tt
          Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
          Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
          delta = Deltas(i,1);
-         VolCorr_radius = Deltas(j,1) / 3.015 / 2;
+         VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
             if (RelativePosition_Vector <= delta-VolCorr_radius) 
             fac = 1;
             elseif (RelativePosition_Vector <= delta+VolCorr_radius)
@@ -369,7 +371,7 @@ for i = 1:TotalNumMatPoint
         Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;%Some weird constant that will be used in bond_constant calculations.
         
         delta = Deltas(i,1);
-        VolCorr_radius = Deltas(j,1) / 3.015 / 2;
+        VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
         if (RelativePosition_Vector <= delta-VolCorr_radius) %if all the way inside the horizon
          fac = 1;
         elseif (RelativePosition_Vector <= delta+VolCorr_radius) %if partially inside the A horizon
@@ -403,7 +405,7 @@ for i = 1:TotalNumMatPoint
 %For points with smaller horizon, this doesn't make a difference, but it
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
-        Volume = (Deltas(j,1) / 3.015) ^ 3;
+        Volume = (Deltas(cnode,1) / 3.015) ^ 3;
         bcs = BCS(i,1);
         bcd = BCD(i,1);
         bondForce_const = (2 * bcd*delta * alpha / RelativePosition_Vector * Directional_cosine * (PD_SED_dilatation_Fixed(i,1))  + ...
@@ -628,7 +630,7 @@ function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCor
         Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
         Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
         delta = Deltas(i,1);
-        VolCorr_radius = Deltas(j,1) / 3.015 / 2;
+        VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
             if (RelativePosition_Vector <= delta-VolCorr_radius)
             fac = 1;
             elseif (RelativePosition_Vector <= delta+VolCorr_radius)
@@ -636,7 +638,7 @@ function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCor
             else
             fac = 0;
             end
-        Volume = (Deltas(j,1) / 3.015) ^ 3;
+        Volume = (Deltas(cnode,1) / 3.015) ^ 3;
         bcs = BCS(i,1);
         bcd = BCD(i,1);
         PD_SED_distorsion(i,1) = PD_SED_distorsion(i,1) + bcs*delta * (Stretch^2) * (RelativePosition_Vector) * Volume * fac;
