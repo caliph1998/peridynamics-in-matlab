@@ -57,6 +57,8 @@ left_tip = ellipseClass((-1) * radius_a, 0, tip_radius, tip_radius); %if major a
 right_tip = ellipseClass(0.20, 0, tip_radius, tip_radius);
 %%
 % coordinate generation for each material point
+path_horizontal = [];
+
 for i = 1:NumofDiv_x
     for j = 1:NumofDiv_y
       coordx = -1/2*length + (dx/2) + (i - 1)*dx;
@@ -88,7 +90,10 @@ for i = 1:NumofDiv_x * 2 - 1
         
       coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
       coordy = -1/2*middle_width + (dxDense/2) + (j - 1)*dxDense;
-
+      
+     if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
+          path_horizontal(end+1) = i;
+     end
       counter = counter + 1;
       coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
       coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
@@ -125,15 +130,6 @@ for i = 1:totalNumMatPoint
     BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
     BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
-%%
-path_horizontal = [];
-for i = 1:totalNumMatPoint
-     coordx = coord(i, 1);
-     coordy = coord(i, 2);
-     if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
-          path_horizontal(end+1) = i;
-     end
-end
 
 %% Definition of needed arrays (coord_excess is trimmed at this stage)
 numfam = zeros(totalNumMatPoint,1); %numfam: Number of family nodes
@@ -148,15 +144,12 @@ path_horizontal = SortPath('hor',path_horizontal, coord); %Sorting horizontal pa
 PDforceold = zeros(totalNumMatPoint,2);
 PD_SED_distorsion = zeros(totalNumMatPoint,2);
 SurCorrFactor_dilatation = zeros(totalNumMatPoint,2); % PD surface correction factor for dilatation
-SurCorrFactor_dilatationold = zeros(totalNumMatPoint,2);% PD surface correction factor old for dilatation
 SurCorrFactor_distorsion = zeros(totalNumMatPoint,2); % PD surface correction factor old for dilatation
-SurCorrFactor_distorsionold = zeros(totalNumMatPoint,2); % PD surface correction factor old for distorsion
 disp = zeros(totalNumMatPoint,2); % displacement
 total_disp = zeros(totalNumMatPoint,2); %The total sum of displacement for each material point
 vel = zeros(totalNumMatPoint,2); % velocity
 velhalfold = zeros(totalNumMatPoint,2);% velocity of half old
 velhalf = zeros(totalNumMatPoint,2); % velocity of half
-acc = zeros(totalNumMatPoint,2); % acceleration
 massvec = zeros(totalNumMatPoint,2);% mass vector
 PD_SED_dilatation = zeros(totalNumMatPoint,2); % Peridynamic strain energy density for dilatation
 PD_SED_dilatation_Fixed = zeros(totalNumMatPoint,2); % Fixed Peridynamic strain energy density for dilatation
@@ -180,7 +173,6 @@ end
 
 scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
-%%
 
 %%
 
@@ -234,20 +226,21 @@ end
 
 
 %Stable mass vector computation
-for i = 1:numOfRemoteMPs
-    DX = Deltas(i,1) / 3.015;
-massvec(i,1) = 0.25 * dt * dt * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / DX * 5;
-massvec(i,2) = 0.25 * dt * dt * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / DX * 5;
-end
-for i = numOfRemoteMPs + 1:totalNumMatPoint
-    DX = Deltas(i,1) / 3.015;
-massvec(i,1) = 0.25 * dt * dt * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / DX * 5 ;
-massvec(i,2) = 0.25 * dt * dt * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / DX * 5;
+for i = 1:totalNumMatPoint
+massvec(i,1) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / (Deltas(i,1) / 3.015);
+massvec(i,2) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / (Deltas(i,1) / 3.015);
 end
 
 %%
-%%%% apply boundary conditions %%%
+%APPLYING EXTRA FORCES AND BOUNDARIES%
 
+for i = 1:totalNumMatPoint
+    if (coord(i,2) == min(coord(:,2))) %applying force to the lower edge
+        BodyForce(i,2) = (-1) * Applied_pressure/dx;
+    elseif(coord(i,2) == max(coord(:,2)))%applying force to the upper edge
+        BodyForce(i,2) =  Applied_pressure/dx; 
+    end
+end
 %{
 %Applied loading - Left
 for i = 1:NumofDiv_y
@@ -281,14 +274,6 @@ BodyForce(i,1) = Applied_pressure/dx;
 end
 %}
 
-
-for i = 1:totalNumMatPoint
-    if (coord(i,2) == min(coord(:,2)))
-        BodyForce(i,2) = (-1) * Applied_pressure/dx;
-    elseif(coord(i,2) == max(coord(:,2)))
-        BodyForce(i,2) =  Applied_pressure/dx;
-    end
-end
 %%
 
 %testNode = 555;
@@ -318,7 +303,6 @@ time = tt
             fac = (Deltas(i,1)+VolCorr_radius-RelativePosition_Vector)/(2*VolCorr_radius);
             else
             fac = 0;
-            error("fac1");
             end
 
             if (abs(coord(cnode,2) - coord(i,2)) <= 1e-10)
@@ -339,7 +323,8 @@ time = tt
             Volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
             bcs = BCS(i,1);
             bcd = BCD(i,1);
-            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + bcd * delta * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
+            
+            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + BCD(i,1) * Deltas(i,1) * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
             %else
             %PD_SED_dilatation_Fixed(i,1) = 0;
             %end                                             
@@ -351,10 +336,8 @@ for i = 1:totalNumMatPoint
     for j = 1:numfam(i,1)
     cnode = nodefam(pointfam(i,1)+j-1,1); %cnode: the current neighbor node/material-point.
     RelativePosition_Vector = sqrt((coord(cnode,1) - coord(i,1))^2 + (coord(cnode,2) - coord(i,2))^2); %the initial distance
-    %The final distance
     RelativeDisp_Vector=sqrt((coord(cnode,1)+disp(cnode,1)-coord(i,1)-disp(i,1))^2+(coord(cnode,2)+disp(cnode,2)-coord(i,2)-disp(i,2))^2);
     Stretch = (RelativeDisp_Vector - RelativePosition_Vector) / RelativePosition_Vector;
-% Consider A/A' as center node and C/C' as current neighbor node, then:
     AbsoluteValue_x_y = RelativeDisp_Vector * RelativePosition_Vector;
     Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1)); %(C'x - Cx)(Cx-Ax)
     Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2)); %(C'y - Cy)(Cy-Ay)
@@ -362,7 +345,7 @@ for i = 1:totalNumMatPoint
         VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
         if (RelativePosition_Vector <= Deltas(i,1)-VolCorr_radius) %if all the way inside the horizon
          fac = 1;
-        elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius && RelativePosition_Vector > Deltas(i,1)-VolCorr_radius) %if partially inside the A horizon
+        elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius) %if partially inside the A horizon
          fac = (Deltas(i,1)+VolCorr_radius-RelativePosition_Vector)/(2*VolCorr_radius); %VolCorr_radius = dx / 2
         else
          fac = 0; %Unnecassary else since it will never happen
@@ -399,10 +382,8 @@ for i = 1:totalNumMatPoint
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
         Volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
-        bcs = BCS(i,1);
-        bcd = BCD(i,1);
-        bondForce_const = (2 * bcd*delta * alpha / RelativePosition_Vector * Directional_cosine * (PD_SED_dilatation_Fixed(i,1) *SurCorrFactor_Arbitrary_dilatation)  + ...
-                      2 * bcs*delta * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
+        bondForce_const = (2 * BCD(i,1)*Deltas(i,1) * alpha / RelativePosition_Vector * Directional_cosine * PD_SED_dilatation_Fixed(i,1)  + ...
+                      2 * BCS(i,1)*Deltas(i,1) * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
         %The point of the two lines below is to split the force vector into its components.
         %But it needs to be divided by RelativeDisp_Vector which is done in
         %the above line which is unclear and confusing.
@@ -644,17 +625,15 @@ function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCor
         VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
             if (RelativePosition_Vector <= Deltas(i,1)-VolCorr_radius)
             fac = 1;
-            elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius && RelativePosition_Vector > Deltas(i,1)-VolCorr_radius)
+            elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius)
             fac = (Deltas(i,1)+VolCorr_radius-RelativePosition_Vector)/(2*VolCorr_radius);
             else
             fac = 0;
             error("error for material point rel and del as follows %f %f", RelativePosition_Vector, Deltas(i,1)-VolCorr_radius);
             end
         Volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
-        bcs = BCS(i,1);
-        bcd = BCD(i,1);
-        PD_SED_distorsion(i,1) = PD_SED_distorsion(i,1) + bcs*Deltas(cnode,1) * (Stretch^2) * (RelativePosition_Vector) * Volume * fac;
-        PD_SED_dilatation(i,1) = PD_SED_dilatation(i,1) +  bcd * Deltas(cnode,1) * Stretch * Directional_cosine * Volume * fac;
+        PD_SED_distorsion(i,1) = PD_SED_distorsion(i,1) + BCS(i,1) * Deltas(i,1) * (Stretch^2) * (RelativePosition_Vector) * Volume * fac;
+        PD_SED_dilatation(i,1) = PD_SED_dilatation(i,1) + BCD(i,1) * Deltas(i,1) * Stretch * Directional_cosine * Volume * fac;
         end
         SurCorrFactor_distorsion(i,1) = SED_analytical_distorsion / PD_SED_distorsion(i,1);
         SurCorrFactor_dilatation(i,1) = SED_analytical_dilatation / PD_SED_dilatation(i,1);
