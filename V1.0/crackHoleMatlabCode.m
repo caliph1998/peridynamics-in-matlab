@@ -1,7 +1,6 @@
 close all
-
-%%
-%GEOMETRICAL PARAMETERS%
+clear all
+%% GEOMETRICAL PARAMETERS
 
 length = 0.5; % Unit: m Plate length
 width = 0.5; % Unit: m Plate width
@@ -15,16 +14,14 @@ thick = dx; % Unit: m thickness of the plate
 Area = dx * dx; % unit: m^2
 Volume = Area * thick; % unit: m^3 %volume of a single material point
 InitialTotalNumMatPoint = NumofDiv_x*NumofDiv_y;
-%%
-%MECHANICAL PROPERTIES%
+%% MECHANICAL PROPERTIES
 
 Elastic_Modulus = 200e9; % Unit: N/m^2
 Possion_ratio = 0.3;  
 Applied_pressure = 500e7; % Unit: N/m^2
 Shear_Modulus = Elastic_Modulus / (2 * (1 + Possion_ratio)); 
 Bulk_Modulus = Elastic_Modulus / (2 * (1 - Possion_ratio)); 
-%%
-%PERIDYNAMICS PARAMETERS%
+%% PERIDYNAMICS PARAMETERS
 
 delta = 3.015 * dx; % Unit: m horizon size: a peridynamics (PD) parameter
 VolCorr_radius = dx / 2; % volume correction related number
@@ -35,28 +32,28 @@ Volume_Horizon = pi * delta ^ 2 * thick; % The volume of the spherical horzion o
 neighborsPerNode = floor(pi * delta ^ 2 / Area);
 totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode;
 nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
-%%
-%OTHER PARAMTETERS%
+%% OTHER PARAMTETERS
+
 dt = 1; % time unit (s)
 TimeInterval = 3000; %TimeInterval: Number of time iTimeIntervalervals
 counter = 0; % a counter used in defining coordinates of each material point
 coord_excess = zeros(InitialTotalNumMatPoint, 2); %an initial coordinate array which will later be trimmed of any excess allocated space
 
-%%
-%DENSE MATERIAL POINT AREA PARAMTERS%
+%% DENSE MATERIAL POINT AREA PARAMTERS 
+
 tipNumOfDiv = 800;
 tip_radius = radius_a / 5 * 3;
 %dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
 dxDense = dx / 2;
 %dx_tip = 6.25e-04;
-%%
-%Defining the tips and the ellipse hole regions using class ellipseClass
+%% DEFINING THE TIPS AND THE ELLIPSE HOLE REGIONS USING CLASS ELLIPSECLASS
+
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
 left_tip = ellipseClass((-1) * radius_a, 0, tip_radius, tip_radius); %if major and minor radii are equal => circle.
 right_tip = ellipseClass(0.20, 0, tip_radius, tip_radius);
-%%
-% coordinate generation for each material point
+%% COORDINATE GENERATION FOR EACH MATERIAL POINT
+
 path_horizontal = [];
 
 for i = 1:NumofDiv_x
@@ -113,7 +110,7 @@ end
 %%
 coord = coord_excess(1:counter, :); %coord: Material point locations
 totalNumMatPoint = size(coord, 1);
-%%
+
 Deltas = zeros(totalNumMatPoint, 1); %an array holding all material points horizons
 BCS = zeros(totalNumMatPoint, 1); % an array holding bcs of all material points
 BCD = zeros(totalNumMatPoint, 1); % an array holding bcd of al material points
@@ -131,16 +128,13 @@ for i = 1:totalNumMatPoint
     BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
 
-%% Definition of needed arrays (coord_excess is trimmed at this stage)
+%% DEFINITION OF NEEDED ARRAYS (COORD_EXCESS IS TRIMMED AT THIS STAGE)
+
+path_horizontal = SortPath('hor',path_horizontal, coord); %Sorting horizontal path from head to tail of the path
 numfam = zeros(totalNumMatPoint,1); %numfam: Number of family nodes
 pointfam = zeros(totalNumMatPoint,1); %pointfam: Pointer
 PDforce = zeros(totalNumMatPoint,2);%PDforce: Peridynamic force
 BodyForce = zeros(totalNumMatPoint,2);%Body force
-%%
-path_horizontal = SortPath('hor',path_horizontal, coord); %Sorting horizontal path from head to tail of the path
-%path_edge = SortPath('edge',path_edge, coord);
-%path_circular = SortPath('circle',path_circular, coord);
-%%
 PDforceold = zeros(totalNumMatPoint,2);
 PD_SED_distorsion = zeros(totalNumMatPoint,2);
 SurCorrFactor_dilatation = zeros(totalNumMatPoint,2); % PD surface correction factor for dilatation
@@ -157,26 +151,13 @@ Check_time = zeros(TimeInterval,1);
 Steady_check_x = zeros(TimeInterval,1);
 Steady_check_y = zeros(TimeInterval,1);
 
-%% DEMONSTRATION OF NEIGHBORS
-node = 3050;
-sz = 50;
-figure(66)
-hold on
-xlabel('x');
-ylabel('y');
-title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
-scatter(coord(:,1), coord(:,2), '.g');
-for j = 1:numfam(node,1)
-    cnode = nodefam(pointfam(node,1)+j-1,1);
-    scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
-end
+%path_edge = SortPath('edge',path_edge, coord);
+%path_circular = SortPath('circle',path_circular, coord);
 
-scatter(coord(node, 1), coord(node, 2), sz, '.b');
-hold off
 
-%%
 
-% coordinate displays with horizon families
+%% COORDINATE DISPLAYS WITH HORIZON FAMILIEDS
+
 for i = 1:totalNumMatPoint
     
     delta = Deltas(i,1);
@@ -231,8 +212,7 @@ massvec(i,1) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / (Del
 massvec(i,2) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / (Deltas(i,1) / 3.015);
 end
 
-%%
-%APPLYING EXTRA FORCES AND BOUNDARIES%
+%% APPLYING EXTRA FORCES AND BOUNDARIES
 
 for i = 1:totalNumMatPoint
     if (coord(i,2) == min(coord(:,2))) %applying force to the lower edge
@@ -479,8 +459,7 @@ Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,node
 unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
 unpunched_d = unpunched_d * (-1);
 normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
-%%
-%DEFORMED VS UNDEFORMED FIGURE
+%% DEFORMED VS UNDEFORMED FIGURE
 figure(1)
 hold on
 h1=plot(coord(:,1),coord(:,2),'.r');
@@ -494,8 +473,7 @@ ylim([-0.4 0.4])
 xlabel('x axis [m]');
 ylabel('y axis[m]');
 
-%%
-%DISPLACEMENT FIELD
+%% DISPLACEMENT FIELD
 figure(2)
 sz = 10;
 subplot(1,2,1);
@@ -514,8 +492,7 @@ ylabel('y');
 title(['U22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
 colorbar('southoutside');
 colormap('jet');
-%%
-%STRESS FIELD
+%% STRESS FIELD
 figure(3)
 sz = 10;
 subplot(1,2,1);
@@ -532,8 +509,7 @@ ylabel('y');
 colorbar('southoutside');
 colormap('jet');
 title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-%%
-%DONGJUN: STRESS vs NORMALIZED DISTANCE
+%% DONGJUN: STRESS vs NORMALIZED DISTANCE
 figure(4)
 subplot(1,2,1);
 ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
@@ -547,8 +523,7 @@ plot(normal_path_horizontal, ssy);
 xlabel('Material Points');
 ylabel('S');
 title('S22 in the horizontal edge');
-%%
-%DONGJUN: STRESS vs MATERIAL POINTS
+%% DONGJUN: STRESS vs MATERIAL POINTS
 figure(5)
 subplot(1,2,1);
 plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
@@ -560,8 +535,7 @@ plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
 xlabel('Material Points');
 ylabel('S');
 title('S22 in the horizontal edge');
-%%
-%DISPLACEMENT vs MATERIAL POINTS
+%% DISPLACEMENT vs MATERIAL POINTS
 figure(6)
 subplot(1,2,1);
 plot((ExtractPathData(path_horizontal, disp, 1)));
@@ -575,8 +549,7 @@ ylabel('U');
 title('U22 in the horizontal edge');
 
 
-%%
-%Test point Deformed vs Undeformed position
+%% TEST POINT DEFORMED vs UNDEFORMED COMPARISON
 figure(7)
 hold on
 h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
@@ -586,11 +559,29 @@ legend([h1 h2],{'Displacement of x direction at blue point','Displacement of y d
 title({'Steady state checking'});
 xlabel('Time');
 ylabel('Displacement [m]');
-%%
+%% HORIZONTAL PATH DEMONSTRATION
+
 figure(8)
 hold on
 scatter(coord(:,1), coord(:,2), '.g');
 scatter(ExtractPathData(path_horizontal, coord, 1), ExtractPathData(path_horizontal, coord, 2), sz + 10, '.b');
+hold off
+%% DEMONSTRATION OF NEIGHBORS
+
+node = 3050;
+sz = 50;
+figure(66)
+hold on
+xlabel('x');
+ylabel('y');
+title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
+scatter(coord(:,1), coord(:,2), '.g');
+for j = 1:numfam(node,1)
+    cnode = nodefam(pointfam(node,1)+j-1,1);
+    scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
+end
+
+scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
 %%
 function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCorrFactor_dilatation] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord)
