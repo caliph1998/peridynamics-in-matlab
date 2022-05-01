@@ -7,7 +7,7 @@ width = 0.5; % Unit: m Plate width
 radius_a = 0.05; % Unit: m central hole major radius
 radius_b = 0.05; % Unit: m central hole minor radius
 ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 50; %NumofDiv_x: Number of divisions in x direction
+NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
 NumofDiv_y = NumofDiv_x;
 dx = length / NumofDiv_x; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
@@ -35,14 +35,12 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %% OTHER PARAMTETERS
 
 dt = 1; % time unit (s)
-TimeInterval = 3000; %TimeInterval: Number of time iTimeIntervalervals
-counter = 0; % a counter used in defining coordinates of each material point
-coord_excess = zeros(InitialTotalNumMatPoint, 2); %an initial coordinate array which will later be trimmed of any excess allocated space
+TimeInterval = 3000 / 50 * NumofDiv_x; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
 tipNumOfDiv = 800;
-tip_radius = radius_a / 5 * 3;
+tip_radius = radius_a / 5 * 5;
 %dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
 dxDense = dx / 2;
 %dx_tip = 6.25e-04;
@@ -51,65 +49,15 @@ dxDense = dx / 2;
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
 left_tip = ellipseClass((-1) * radius_a, 0, tip_radius, tip_radius); %if major and minor radii are equal => circle.
-right_tip = ellipseClass(0.20, 0, tip_radius, tip_radius);
+right_tip = ellipseClass(radius_a, 0, tip_radius, tip_radius);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
-path_horizontal = [];
 
-for i = 1:NumofDiv_x
-    for j = 1:NumofDiv_y
-      coordx = -1/2*length + (dx/2) + (i - 1)*dx;
-      coordy = -1/2*width + (dx/2) + (j - 1)*dx;
-      
-      %Applying the hole in the plate (can be deactivated by commenting the
-      %if statement below%
-      
-      if (coordy > -0.125 && coordy < 0.125)
-          continue
-          %nullpoint(nnum,1) = 0;
-      end
-      
-      %Defining paths of material points similar to the path feature in
-      %ABAQUS%%%%%%%(ONLY THE HORIZONTAL PATH WORKS)
+%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint);
+[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
 
-      counter = counter + 1;
-      coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
-      coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
-       
-    end
-end
 
-coord_excess = coord_excess(1:counter, :); %coord_excess is trimmed here once
-numOfRemoteMPs = counter;
-middle_width = width / 2;
-for i = 1:NumofDiv_x * 2 - 1
-    for j = 1:NumofDiv_y
-        
-      coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
-      coordy = -1/2*middle_width + (dxDense/2) + (j - 1)*dxDense;
-      
-     if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
-          path_horizontal(end+1) = i;
-     end
-      counter = counter + 1;
-      coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
-      coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
-       
-    end
-end
-
-%%
-% get_circle initiatitor looks like this => get_circle(X, Y, R, dx, mid_circle)
-
-%EXTRACTING COORDINATES OF THE CRACK TIP LOCAL MATERIAL
-%POINTS FROM get_circle AND IMPORTING THEM INTO COORD
-
-%seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dx_tip, center_hole);
-%seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dx_tip, center_hole);
-%coord = [coord; seedLeft; seedRight];
-%%
-coord = coord_excess(1:counter, :); %coord: Material point locations
-totalNumMatPoint = size(coord, 1);
+%% HORIZON SIZE ASSIGNEMNTS
 
 Deltas = zeros(totalNumMatPoint, 1); %an array holding all material points horizons
 BCS = zeros(totalNumMatPoint, 1); % an array holding bcs of all material points
@@ -157,7 +105,7 @@ Steady_check_y = zeros(TimeInterval,1);
 
 
 %% COORDINATE DISPLAYS WITH HORIZON FAMILIEDS
-
+tic
 for i = 1:totalNumMatPoint
     
     delta = Deltas(i,1);
@@ -178,7 +126,7 @@ for i = 1:totalNumMatPoint
         end
     end
 end
-
+toc
 lastBondIter = pointfam(i,1) + numfam(i,1) - 1; % Used to trim nodefam and to define bondForces array
 nodefam = nodefam(1:lastBondIter, 1); %Trimming the nodefame to the last non-zero value.
 bondForces = zeros(lastBondIter, 1);
@@ -254,14 +202,14 @@ BodyForce(i,1) = Applied_pressure/dx;
 end
 %}
 
-%%
+%% MAIN CODE PART
 
 %testNode = 555;
 testCoordinates = [0.2225, -0.0023431];
-testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord, center_hole, left_tip, right_tip, counter);
+testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord);
 
 
-%%%% Time Interval starts for computing displament of each material point %%% 
+tic
 for tt = 1:TimeInterval
 time = tt
     
@@ -451,6 +399,7 @@ Check_time(tt,1)= tt;
 Steady_check_x(tt,1) = disp(testNode,1);
 Steady_check_y(tt,1) = disp(testNode,2);
 end
+toc
 %time interval iteration ends
 
 % 50*40 +(25+12) = 2037
@@ -568,7 +517,7 @@ scatter(ExtractPathData(path_horizontal, coord, 1), ExtractPathData(path_horizon
 hold off
 %% DEMONSTRATION OF NEIGHBORS
 
-node = 3050;
+node = 5;
 sz = 50;
 figure(66)
 hold on
@@ -584,6 +533,66 @@ end
 scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
 %%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function [PD_SED_distorsion, SurCorrFactor_distorsion, PD_SED_dilatation, SurCorrFactor_dilatation] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,TotalNumMatPoint,numfam,nodefam,pointfam,coord)
         Elastic_Modulus = 200e9; % unit: N/m^2
         % Classical strain energy for dilatation
@@ -697,6 +706,115 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
         stress(i,1) = stress_x;
         stress(i,2) = stress_y;
     end
-    satisfy_x
-    satisfy_y
 end
+
+function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, matPointNum)
+
+NumofDiv_y = NumofDiv_x;
+path = [];
+coord_excess = zeros(matPointNum, 2);
+counter = 0; % a counter used in defining coordinates of each material point
+
+for i = 1:NumofDiv_x
+    for j = 1:NumofDiv_y
+      coordx = -1/2*length + (dx/2) + (i - 1)*dx;
+      coordy = -1/2*width + (dx/2) + (j - 1)*dx;
+      
+      %Applying the hole in the plate (can be deactivated by commenting the
+      %if statement below%
+      
+      if (coordy > -0.125 && coordy < 0.125)
+          continue
+          %nullpoint(nnum,1) = 0;
+      end
+      
+      %Defining paths of material points similar to the path feature in
+      %ABAQUS%%%%%%%(ONLY THE HORIZONTAL PATH WORKS)
+
+      counter = counter + 1;
+      coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
+      coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
+       
+    end
+end
+
+coord_excess = coord_excess(1:counter, :); %coord_excess is trimmed here once
+numOfRemoteMPs = counter;
+middle_width = width / 2;
+for i = 1:NumofDiv_x * 2 - 1
+    for j = 1:NumofDiv_y
+        
+      coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
+      coordy = -1/2*middle_width + (dxDense/2) + (j - 1)*dxDense;
+      
+     if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
+          path(end+1) = i;
+     end
+      counter = counter + 1;
+      coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
+      coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
+       
+    end
+end
+
+coord = coord_excess(1:counter, :); %coord: Material point locations
+totalNumMatPoint = size(coord, 1);
+
+end
+
+function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, matPointNum, center_hole, left_tip, right_tip)
+NumofDiv_y = NumofDiv_x;
+path = [];
+coord_excess = zeros(matPointNum, 2);
+counter = 0; % a counter used in defining coordinates of each material point
+
+for i = 1:NumofDiv_x
+    for j = 1:NumofDiv_y
+      coordx = -1/2*length + (dx/2) + (i - 1)*dx;
+      coordy = -1/2*width + (dx/2) + (j - 1)*dx;
+      
+      %Applying the hole in the plate (can be deactivated by commenting the
+      %if statement below%
+      
+      if (center_hole.inEllipse(coordx, coordy) || left_tip.inEllipse(coordx, coordy) || right_tip.inEllipse(coordx, coordy))
+          continue
+          %nullpoint(nnum,1) = 0;
+      end
+      
+      %Defining paths of material points similar to the path feature in
+      %ABAQUS%%%%%%%(ONLY THE HORIZONTAL PATH WORKS)
+
+      counter = counter + 1;
+      coord_excess(counter,1) = coordx; %A coord_excess is defined since initially a larger than needed array size has to be used.
+      coord_excess(counter,2) = coordy; %coord-excess is trimmed later as the end elements are empty.
+       
+    end
+end
+coord = coord_excess(1:counter, :); %coord_excess is trimmed here once
+numOfRemoteMPs = counter;
+
+seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dxDense, center_hole);
+seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dxDense, center_hole);
+coord = [coord; seedLeft; seedRight];
+totalNumMatPoint = size(coord, 1);
+
+
+for i = 1: numOfRemoteMPs
+    
+    coordx = coord(i, 1);
+    coordy = coord(i, 2);
+    if ( abs(coordy) <= dx && coordx >= 0 && coordy > 0)
+          path(end+1) = i;
+    end
+end
+
+for i = numOfRemoteMPs + 1: totalNumMatPoint
+    coordx = coord(i, 1);
+    coordy = coord(i, 2);
+    if (abs(coordy) <= dxDense && coordx >= 0 && coordy > 0)
+        path(end+1) =i;
+    end
+end
+
+end
+

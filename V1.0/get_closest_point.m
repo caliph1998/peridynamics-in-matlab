@@ -1,8 +1,5 @@
-function [closestPoint] = get_closest_point(given_x, given_y, coord, center_hole, left_tip, right_tip, nnum)
-    if (center_hole.inEllipse(given_x, given_y))
-        closestPoint = 0;
-        return;
-    end
+function [closestPoint] = get_closest_point(given_x, given_y, coord)
+
     S = size(coord); %THE TOTAL NUMBER OF MATERIAL POINTS HAS TO BE UPDATED
     TotalNumMatPoint = S(1);
     %if (left_tip.inEllipse(given_x, given_y) || right_tip.inEllipse(given_x, given_y))
