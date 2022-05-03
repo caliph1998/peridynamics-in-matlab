@@ -7,7 +7,7 @@ width = 0.5; % Unit: m Plate width
 radius_a = 0.05; % Unit: m central hole major radius
 radius_b = 0.05; % Unit: m central hole minor radius
 ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
+NumofDiv_x = 50; %NumofDiv_x: Number of divisions in x direction
 NumofDiv_y = NumofDiv_x;
 dx = length / NumofDiv_x; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
@@ -35,12 +35,11 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %% OTHER PARAMTETERS
 
 dt = 1; % time unit (s)
-TimeInterval = 3000 / 50 * NumofDiv_x; %TimeInterval: Number of time iTimeIntervalervals
+TimeInterval = 5000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
-tipNumOfDiv = 800;
-tip_radius = radius_a / 5 * 5;
+tip_radius = radius_a;
 %dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
 dxDense = dx / 2;
 %dx_tip = 6.25e-04;
@@ -205,7 +204,7 @@ end
 %% MAIN CODE PART
 
 %testNode = 555;
-testCoordinates = [0.2225, -0.0023431];
+testCoordinates = [tip_radius * 6 / 5, 0];
 testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord);
 
 
@@ -408,9 +407,37 @@ Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,node
 unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
 unpunched_d = unpunched_d * (-1);
 normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
+
+%% GETTING THE SAVING ADDRESS FROM THE USER
+
+while 1 == 1
+    address = 0;
+    prompt = 'Where to save files? Enter the address. Press Enter if no save is needed:\n';
+    addressOld = input(prompt, 's');
+    if (isempty(addressOld) == 0 && isfolder(addressOld) == 0)
+     fprintf('\ninvalid address. This folder does not exist. Please try again\n');
+     continue;
+    end
+    prompt = 'For security, please re-enter the address. Press Enter if no save is needed:\n';
+    addressRepeat = input(prompt, 's');
+    if (strcmp(addressOld, addressRepeat) == 0)
+        fprintf('\nRepeated address does not match with the previous one. Try again\n');
+        continue;
+    end
+    address = addressRepeat;
+    break;
+end
+%% SAVING THE WORKSPACE
+
+if (isempty(address) == 0)
+    save(strcat(address, '\workspace'));
+end
 %% DEFORMED VS UNDEFORMED FIGURE
+
+
 figure(1)
 hold on
+figureNameDeformation = '\deformation.jpeg';
 h1=plot(coord(:,1),coord(:,2),'.r');
 h2=plot(coord(:,1)+disp(:,1),coord(:,2)+disp(:,2),'.b');
 h3=plot(coord(testNode,1),coord(testNode,2),'ro','MarkerSize',3.3,'MarkerFaceColor','r');
@@ -422,8 +449,11 @@ ylim([-0.4 0.4])
 xlabel('x axis [m]');
 ylabel('y axis[m]');
 
+
+saveAndPrintFigure(gcf, address, figureNameDeformation);
 %% DISPLACEMENT FIELD
 figure(2)
+figureNameDisp = '\dispXXYY.jpeg';
 sz = 10;
 subplot(1,2,1);
 %plotting the absolute values of displacements%
@@ -441,8 +471,11 @@ ylabel('y');
 title(['U22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
 colorbar('southoutside');
 colormap('jet');
+
+saveAndPrintFigure(gcf, address, figureNameDisp);
 %% STRESS FIELD
 figure(3)
+figureNameStress = '\stressXXYY(INCORRECT).jpeg';
 sz = 10;
 subplot(1,2,1);
 scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)), 'filled');
@@ -458,6 +491,8 @@ ylabel('y');
 colorbar('southoutside');
 colormap('jet');
 title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+
+saveAndPrintFigure(gcf, address, figureNameStress);
 %% DONGJUN: STRESS vs NORMALIZED DISTANCE
 figure(4)
 subplot(1,2,1);
@@ -472,6 +507,7 @@ plot(normal_path_horizontal, ssy);
 xlabel('Material Points');
 ylabel('S');
 title('S22 in the horizontal edge');
+
 %% DONGJUN: STRESS vs MATERIAL POINTS
 figure(5)
 subplot(1,2,1);
@@ -486,6 +522,7 @@ ylabel('S');
 title('S22 in the horizontal edge');
 %% DISPLACEMENT vs MATERIAL POINTS
 figure(6)
+figureNameDispPath = '\dispPath.jpeg';
 subplot(1,2,1);
 plot((ExtractPathData(path_horizontal, disp, 1)));
 xlabel('Material Points');
@@ -497,9 +534,10 @@ xlabel('Material Points');
 ylabel('U');
 title('U22 in the horizontal edge');
 
-
+saveAndPrintFigure(gcf, address, figureNameDispPath);
 %% TEST POINT DEFORMED vs UNDEFORMED COMPARISON
 figure(7)
+figureNameStability = '\stability.jpeg';
 hold on
 h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
 h2=plot(Check_time(:,1),Steady_check_y(:,1),'.g');
@@ -508,18 +546,24 @@ legend([h1 h2],{'Displacement of x direction at blue point','Displacement of y d
 title({'Steady state checking'});
 xlabel('Time');
 ylabel('Displacement [m]');
+
+saveAndPrintFigure(gcf, address, figureNameStability);
 %% HORIZONTAL PATH DEMONSTRATION
 
 figure(8)
+figureNamePath = '\pathDemonstration.jpeg';
 hold on
 scatter(coord(:,1), coord(:,2), '.g');
 scatter(ExtractPathData(path_horizontal, coord, 1), ExtractPathData(path_horizontal, coord, 2), sz + 10, '.b');
 hold off
+
+saveAndPrintFigure(gcf, address, figureNamePath);
 %% DEMONSTRATION OF NEIGHBORS
 
 node = 5;
 sz = 50;
 figure(66)
+figureNameNeighbors = '\arrangement.jpeg';
 hold on
 xlabel('x');
 ylabel('y');
@@ -532,6 +576,8 @@ end
 
 scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
+
+saveAndPrintFigure(gcf, address, figureNameNeighbors);
 %%
 
 
@@ -816,5 +862,11 @@ for i = numOfRemoteMPs + 1: totalNumMatPoint
     end
 end
 
+end
+
+function saveAndPrintFigure(gcf, address, figureName)
+    if (isempty(address) == 0)
+        saveas(gcf, strcat(address, figureName));
+    end
 end
 
