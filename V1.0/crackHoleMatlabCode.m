@@ -97,7 +97,7 @@ PD_SED_dilatation_Fixed = zeros(totalNumMatPoint,2); % Fixed Peridynamic strain 
 Check_time = zeros(TimeInterval,1);
 Steady_check_x = zeros(TimeInterval,1);
 Steady_check_y = zeros(TimeInterval,1);
-
+fprintf('Large arrays assigned. \n');
 %path_edge = SortPath('edge',path_edge, coord);
 %path_circular = SortPath('circle',path_circular, coord);
 
@@ -126,6 +126,7 @@ for i = 1:totalNumMatPoint
     end
 end
 toc
+fprintf('\nNeighbors assigned. \n');
 lastBondIter = pointfam(i,1) + numfam(i,1) - 1; % Used to trim nodefam and to define bondForces array
 nodefam = nodefam(1:lastBondIter, 1); %Trimming the nodefame to the last non-zero value.
 bondForces = zeros(lastBondIter, 1);
@@ -138,6 +139,7 @@ end
 
 %%Surface correction factor calculation - function%%
 [PD_SED_distorsion(:,1),SurCorrFactor_distorsion(:,1),PD_SED_dilatation(:,1), SurCorrFactor_dilatation(:,1)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
+fprintf('\nPD_SEDs  in x direction assigned\n');
     
 for i = 1:totalNumMatPoint
     disp(i,1) = 0;
@@ -145,6 +147,7 @@ for i = 1:totalNumMatPoint
 end
 [PD_SED_distorsion(:,2), SurCorrFactor_distorsion(:,2),PD_SED_dilatation(:,2), SurCorrFactor_dilatation(:,2)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
 %Surface correction factor calculation - end
+fprintf('\nPD_SEDs  in y direction assigned\n');
     
 %initial displacemeTimeInterval
 for i = 1:totalNumMatPoint
