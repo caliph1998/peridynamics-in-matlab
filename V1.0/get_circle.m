@@ -23,7 +23,7 @@ function [coord_excess] = get_circle(X, Y, R, dx, midCircle)
             coordx = x;
             coordy = 2 * Y - y + (j - 1) * dx;
              if (midCircle.inEllipse(coordx, coordy))
-                % continue;
+                continue;
              end
             
             nnum = nnum + 1;
