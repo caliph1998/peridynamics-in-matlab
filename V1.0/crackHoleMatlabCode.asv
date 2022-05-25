@@ -35,7 +35,7 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %% OTHER PARAMTETERS
 
 dt = 1; % time unit (s)
-TimeInterval = 5000; %TimeInterval: Number of time iTimeIntervalervals
+TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
@@ -340,7 +340,8 @@ for i = 1:totalNumMatPoint
         PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
         PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
         
-        
+        cnodeNeighIndex = 0;
+        cnodeNeighIndex = FindcNodeNeigh(
 
     end
 end
