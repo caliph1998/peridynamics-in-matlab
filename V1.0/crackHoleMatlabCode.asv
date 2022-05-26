@@ -7,7 +7,7 @@ width = 0.5; % Unit: m Plate width
 radius_a = 0.05; % Unit: m central hole major radius
 radius_b = 0.01; % Unit: m central hole minor radius
 ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 50; %NumofDiv_x: Number of divisions in x direction
+NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
 NumofDiv_y = NumofDiv_x;
 dx = length / NumofDiv_x; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
@@ -35,7 +35,7 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %% OTHER PARAMTETERS
 
 dt = 1; % time unit (s)
-TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
+TimeInterval = 5000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
@@ -47,13 +47,13 @@ dxDense = dx / 2;
 
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
-left_tip = ellipseClass(0, 0, radius_a * 2, radius_a * 2); %if major and minor radii are equal => circle.
+left_tip = ellipseClass(0, 0, radius_a * 2 * 0, radius_a * 2 * 0); %if major and minor radii are equal => circle.
 right_tip = ellipseClass(radius_a, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
 
-[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
-%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
+%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
+[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
 
 
 %% HORIZON SIZE ASSIGNEMNTS
@@ -128,7 +128,7 @@ end
 toc
 fprintf('\nNeighbors assigned. \n');
 lastBondIter = pointfam(i,1) + numfam(i,1) - 1; % Used to trim nodefam and to define bondForces array
-nodefam = nodefam(1:lastBondIter, 1); %Trimming the nodefame to the last non-zero value.
+%nodefam = nodefam(1:lastBondIter, 1); %Trimming the nodefame to the last non-zero value.
 bondForces = zeros(lastBondIter, 1);
 
 %Surface correction factor calculation - start
@@ -323,8 +323,6 @@ for i = 1:totalNumMatPoint
         PDforce(i,1) = PDforce(i,1) + directForce_x;     
         PDforce(i,2) = PDforce(i,2) + directForce_y;
         
-        nodefam(pointfam(i,1)+j-1,2) = directForce_x;
-        nodefam(pointfam(i,1)+j-1,3) = directForce_y;
         
         directForce_x = directForce_x / (Volume * fac);
         directForce_y = directForce_y / (Volume * fac);
@@ -339,9 +337,19 @@ for i = 1:totalNumMatPoint
         reactionaryForce_y = (-1) * directForce_y;
         PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
         PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
+ 
+        nodefam(pointfam(i,1)+j-1, 2) = nodefam(pointfam(i,1)+j-1, 2) +  directForce_x;
+        nodefam(pointfam(i,1)+j-1, 3) = nodefam(pointfam(i,1)+j-1, 3) +  directForce_y;
+        for iter = pointfam(cnode, 1): numfam(cnode, 1) - 1
+            neighb = nodefam(iter, 1);
+            if (neighb ~= i)
+                continue;
+            end
+        i_index = iter;
+        nodefam(i_index, 2) = nodefam(i_index, 2) + reactionaryForce_x;
+        nodefam(i_index, 3) = nodefam(i_index, 3) + reactionaryForce_y;
+        end
         
-        cnodeNeighIndex = 0;
-        cnodeNeighIndex = FindcNodeNeigh(
 
     end
 end
@@ -408,7 +416,7 @@ toc
 
 % 50*40 +(25+12) = 2037
 %%
-Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,nodefam, pointfam, thick);
+Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,nodefam, pointfam, Deltas);
 unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
 unpunched_d = unpunched_d * (-1);
 normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
@@ -524,6 +532,7 @@ plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
 xlabel('Material Points');
 ylabel('S');
 title('S22 in the horizontal edge');
+saveAndPrintFigure(gcf, address, figureNameDispPath);
 %% DISPLACEMENT vs MATERIAL POINTS
 figure(6)
 figureNameDispPath = '\dispPath.jpeg';
@@ -725,38 +734,39 @@ end
 
 %%%The function below calculates the stresses in the x and y direction of
 %%%any point on the plate and returns a stress array.
-function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefam, pointfam, thick)
+function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefam, pointfam, Deltas)
     stress = zeros(TotalNumMatPoint, 2); %Predifining the size of the stress array to speed up the calculations.
 
-    for i = 1: (TotalNumMatPoint)
+    for i = 1: TotalNumMatPoint
         f_x = 0; %Sum of all forces in X direction
         f_y = 0; %Sum of all forces in Y direction
         satisfy_x = 0;
         satisfy_y = 0;
+        localThickness = Deltas(i,1) / 3.015 / 2;
         point_x = coord(i,1); %% Extract coordinates of point i
         point_y = coord(i,2);
         for j = 1: TotalNumMatPoint %% Iterating every other material point for conditions
-            if (coord(j,2) == point_y && coord(j,1) < point_x + thick / 2) %% coord(j,2) == point_y &&
+            if (coord(j,2) == point_y && coord(j,1) < point_x + localThickness / 2) %% coord(j,2) == point_y &&
                     satisfy_x = satisfy_x + 1;
                     for k = 1:numfam(j,1) %%Iterate for all the neighbors of point j that satisfy the conditions.
                         cnode = nodefam(pointfam(j,1)+k-1,1);
-                        if (coord(cnode,1) > point_x + thick / 2) % Sum bondforce of the neighbors that satisfy this condition
+                        if (coord(cnode,1) > point_x + localThickness / 2) % Sum bondforce of the neighbors that satisfy this condition
                             f_x = f_x + nodefam(pointfam(j,1)+k-1, 2); %%% Requires Saving BondForce_x in nodefam(:,2)
                         end
                     end
             end
             %Same below for stress in y direction
-            if (coord(j,1) == point_x && coord(j,2) < point_y + thick / 2) %%%%coord(j,1) == point_x &&
+            if (coord(j,1) == point_x && coord(j,2) < point_y + localThickness / 2) %%%%coord(j,1) == point_x &&
                     satisfy_y = satisfy_y + 1;
                     for k = 1:numfam(j,1) %%Iterate for all the neighbors of point j that satisfy the conditions.
                         cnode = nodefam(pointfam(j,1)+k-1,1);
-                        if (coord(cnode,2) > point_y + thick / 2) % Sum bondforce of the neighbors that satisfy this condition
+                        if (coord(cnode,2) > point_y + localThickness / 2) % Sum bondforce of the neighbors that satisfy this condition
                             f_y = f_y + nodefam(pointfam(j,1)+k-1, 3); %%% Requires Saving BondForce_x in nodefam(:,2)
                         end
                     end
             end
-            stress_x = f_x * thick;
-            stress_y = f_y * thick;
+            stress_x = f_x * localThickness;
+            stress_y = f_y * localThickness;
         end
         %Saving the stress for point i before moving on to the next point
         %on the plate
