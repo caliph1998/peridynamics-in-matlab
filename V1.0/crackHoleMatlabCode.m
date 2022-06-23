@@ -5,9 +5,9 @@ clear all
 length = 0.5; % Unit: m Plate length
 width = 0.5; % Unit: m Plate width
 radius_a = 0.05; % Unit: m central hole major radius
-radius_b = 0.01; % Unit: m central hole minor radius
+radius_b = 0.05; % Unit: m central hole minor radius
 ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
+NumofDiv_x = 50; %NumofDiv_x: Number of divisions in x direction
 NumofDiv_y = NumofDiv_x;
 dx = length / NumofDiv_x; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
@@ -35,7 +35,7 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %% OTHER PARAMTETERS
 
 dt = 1; % time unit (s)
-TimeInterval = 5000; %TimeInterval: Number of time iTimeIntervalervals
+TimeInterval = 3000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
@@ -52,8 +52,8 @@ right_tip = ellipseClass(radius_a, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
 
-%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
-[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
+[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
+%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
 
 
 %% HORIZON SIZE ASSIGNEMNTS
@@ -262,6 +262,8 @@ time = tt
     end
 
 PDforce = zeros(totalNumMatPoint, 2);
+nodefam(:,2) = 0;
+nodefam(:,3) = 0;
 for i = 1:totalNumMatPoint
     for j = 1:numfam(i,1)
     cnode = nodefam(pointfam(i,1)+j-1,1); %cnode: the current neighbor node/material-point.
@@ -338,19 +340,21 @@ for i = 1:totalNumMatPoint
         PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
         PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
  
+       if (tt == TimeInterval)
         nodefam(pointfam(i,1)+j-1, 2) = nodefam(pointfam(i,1)+j-1, 2) +  directForce_x;
         nodefam(pointfam(i,1)+j-1, 3) = nodefam(pointfam(i,1)+j-1, 3) +  directForce_y;
-        for iter = pointfam(cnode, 1): numfam(cnode, 1) - 1
-            neighb = nodefam(iter, 1);
-            if (neighb ~= i)
-                continue;
-            end
-        i_index = iter;
-        nodefam(i_index, 2) = nodefam(i_index, 2) + reactionaryForce_x;
-        nodefam(i_index, 3) = nodefam(i_index, 3) + reactionaryForce_y;
-        end
         
-
+           for iter = pointfam(cnode, 1): pointfam(cnode,1) + numfam(cnode, 1) - 1
+                neighb = nodefam(iter, 1);
+              if (neighb ~= i)
+                 continue;
+              end
+         i_index = iter;
+         nodefam(i_index, 2) = nodefam(i_index, 2) + reactionaryForce_x;
+         nodefam(i_index, 3) = nodefam(i_index, 3) + reactionaryForce_y;
+           end
+       end    
+           
     end
 end
 
@@ -505,8 +509,28 @@ colormap('jet');
 title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
 
 saveAndPrintFigure(gcf, address, figureNameStress);
-%% DONGJUN: STRESS vs NORMALIZED DISTANCE
+%% NORMAL STRESS FIELD
 figure(4)
+figureNameStress = '\stressXXYYNormal(INCORRECT).jpeg';
+sz = 10;
+subplot(1,2,1);
+scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)) / Applied_pressure, 'filled');
+xlabel('x');
+ylabel('y');
+colorbar('southoutside');
+colormap('jet');
+title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+subplot(1,2,2);
+scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)) / Applied_pressure, 'filled');
+xlabel('x');
+ylabel('y');
+colorbar('southoutside');
+colormap('jet');
+title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+
+saveAndPrintFigure(gcf, address, figureNameStress);
+%% DONGJUN: STRESS vs NORMALIZED DISTANCE
+figure(5)
 figureNameStressPathNorm = '\stressPathNorm.jpeg';
 subplot(1,2,1);
 ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
@@ -522,7 +546,7 @@ ylabel('S');
 title('S22 in the horizontal edge');
 saveAndPrintFigure(gcf, address, figureNameStressPathNorm);
 %% DONGJUN: STRESS vs MATERIAL POINTS
-figure(5)
+figure(6)
 figureNameStressPath = '\stressPath.jpeg';
 subplot(1,2,1);
 plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
@@ -536,7 +560,7 @@ ylabel('S');
 title('S22 in the horizontal edge');
 saveAndPrintFigure(gcf, address, figureNameStressPath);
 %% DISPLACEMENT vs MATERIAL POINTS
-figure(6)
+figure(7)
 figureNameDispPath = '\dispPath.jpeg';
 subplot(1,2,1);
 plot((ExtractPathData(path_horizontal, disp, 1)));
@@ -550,8 +574,8 @@ ylabel('U');
 title('U22 in the horizontal edge');
 
 saveAndPrintFigure(gcf, address, figureNameDispPath);
-%% TEST POINT DEFORMED vs UNDEFORMED COMPARISON
-figure(7)
+%% STEADY STATE CHECK
+figure(8)
 figureNameStability = '\stability.jpeg';
 hold on
 h1=plot(Check_time(:,1),Steady_check_x(:,1),'.k');
@@ -565,7 +589,7 @@ ylabel('Displacement [m]');
 saveAndPrintFigure(gcf, address, figureNameStability);
 %% HORIZONTAL PATH DEMONSTRATION
 
-figure(8)
+figure(9)
 figureNamePath = '\pathDemonstration.jpeg';
 hold on
 scatter(coord(:,1), coord(:,2), '.g');
@@ -577,19 +601,19 @@ saveAndPrintFigure(gcf, address, figureNamePath);
 
 node = 5;
 sz = 50;
-figure(66)
+figure(10)
 figureNameNeighbors = '\arrangement.jpeg';
 hold on
 xlabel('x');
 ylabel('y');
 title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
 scatter(coord(:,1), coord(:,2), '.g');
-for j = 1:numfam(node,1)
-    cnode = nodefam(pointfam(node,1)+j-1,1);
-    scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
-end
+%for j = 1:numfam(node,1)
+ %   cnode = nodefam(pointfam(node,1)+j-1,1);
+  %  scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
+%end
 
-scatter(coord(node, 1), coord(node, 2), sz, '.b');
+%scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
 
 saveAndPrintFigure(gcf, address, figureNameNeighbors);
@@ -744,7 +768,8 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
         f_y = 0; %Sum of all forces in Y direction
         satisfy_x = 0;
         satisfy_y = 0;
-        localThickness = Deltas(i,1) / 3.015 / 2;
+
+        localThickness = Deltas(1,1) / 3.015 / 2;
         point_x = coord(i,1); %% Extract coordinates of point i
         point_y = coord(i,2);
         for j = 1: TotalNumMatPoint %% Iterating every other material point for conditions
@@ -763,11 +788,12 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
                     for k = 1:numfam(j,1) %%Iterate for all the neighbors of point j that satisfy the conditions.
                         cnode = nodefam(pointfam(j,1)+k-1,1);
                         if (coord(cnode,2) > point_y + localThickness / 2) % Sum bondforce of the neighbors that satisfy this condition
-                            f_y = f_y + nodefam(pointfam(j,1)+k-1, 3); %%% Requires Saving BondForce_x in nodefam(:,2)
+                            f_y = f_y + nodefam(pointfam(j,1)+k-1, 3); %%% Requires Saving BondForce_y in nodefam(:,3)
                         end
                     end
             end
             stress_x = f_x * localThickness;
+             
             stress_y = f_y * localThickness;
         end
         %Saving the stress for point i before moving on to the next point
