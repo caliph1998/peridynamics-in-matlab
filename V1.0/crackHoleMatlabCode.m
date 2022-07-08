@@ -47,7 +47,7 @@ dxDense = dx / 2;
 
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
 center_hole = ellipseClass(0, 0, radius_a, radius_b);
-left_tip = ellipseClass(0, 0, radius_a * 2 * 0, radius_a * 2 * 0); %if major and minor radii are equal => circle.
+left_tip = ellipseClass(0, 0, radius_a * 2 * 0 , radius_a * 2 * 0 ); %if major and minor radii are equal => circle.
 right_tip = ellipseClass(radius_a, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
@@ -118,7 +118,7 @@ for i = 1:totalNumMatPoint
         RelativePosition_Vector = sqrt((coord(j,1) - coord(i,1))^2 + (coord(j,2) - coord(i,2))^2);
         if(i~=j)
             volCorr_radius = Deltas(j,1) / 3.015 / 2;
-            if(RelativePosition_Vector <= delta + volCorr_radius)
+            if(RelativePosition_Vector <= delta )%+ volCorr_radius)
             numfam(i,1) = numfam(i,1) + 1;
             nodefam(pointfam(i,1)+numfam(i,1)-1,1) = j;
             end
@@ -210,6 +210,11 @@ end
 testCoordinates = [tip_radius * 6 / 5, 0];
 testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord);
 
+
+directForces = zeros(100000,4);
+reactForces = zeros(100000,4);
+iterDirect = 1;
+iterReact = 1;
 
 tic
 for tt = 1:TimeInterval
@@ -334,13 +339,31 @@ for i = 1:totalNumMatPoint
         directForce_x = directForce_x * (Volume * fac);
         directForce_y = directForce_y * (Volume * fac);
         
+
+
+        
         
         reactionaryForce_x = (-1) * directForce_x;
         reactionaryForce_y = (-1) * directForce_y;
         PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
         PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
+        
+        
+
+        
  
        if (tt == TimeInterval)
+        directForces(iterDirect, 1) = i;
+        directForces(iterDirect, 2) = cnode;
+        directForces(iterDirect, 3) = directForce_x;
+        directForces(iterDirect, 4) = directForce_y;
+        iterDirect = iterDirect + 1;
+        
+        reactForces(iterReact, 1) = cnode;
+        reactForces(iterReact, 2) = i;
+        reactForces(iterReact, 3) = reactionaryForce_x;
+        reactForces(iterReact, 4) = reactionaryForce_y;
+        iterReact = iterReact + 1;
         nodefam(pointfam(i,1)+j-1, 2) = nodefam(pointfam(i,1)+j-1, 2) +  directForce_x;
         nodefam(pointfam(i,1)+j-1, 3) = nodefam(pointfam(i,1)+j-1, 3) +  directForce_y;
         
@@ -599,7 +622,7 @@ hold off
 saveAndPrintFigure(gcf, address, figureNamePath);
 %% DEMONSTRATION OF NEIGHBORS
 
-node = 5;
+node = 2798;
 sz = 50;
 figure(10)
 figureNameNeighbors = '\arrangement.jpeg';
@@ -608,22 +631,75 @@ xlabel('x');
 ylabel('y');
 title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
 scatter(coord(:,1), coord(:,2), '.g');
-%for j = 1:numfam(node,1)
- %   cnode = nodefam(pointfam(node,1)+j-1,1);
-  %  scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
-%end
+for j = 1:numfam(node,1)
+   cnode = nodefam(pointfam(node,1)+j-1,1);
+   scatter(coord(cnode, 1), coord(cnode, 2), sz, '.r');
+end
 
-%scatter(coord(node, 1), coord(node, 2), sz, '.b');
+scatter(coord(node, 1), coord(node, 2), sz, '.b');
 hold off
 
 saveAndPrintFigure(gcf, address, figureNameNeighbors);
 %%
+stressD = zeros(totalNumMatPoint, 1);
+stressA = zeros(totalNumMatPoint, 1);
+for testNode = 1:totalNumMatPoint
+fyA = 0;
+fyD = 0;
+for i = pointfam(testNode, 1) : pointfam(testNode, 1) + numfam(testNode, 1) - 1
+    neighbor = nodefam(i, 1);
+    if (coord(neighbor,2) > coord(testNode,2))
+        fyA = fyA + (nodefam(i,3));
+        fyD = fyD + (nodefam(i,3));
+    elseif (coord(neighbor,1) == coord(testNode,1))
+        for j = pointfam(neighbor,1) : pointfam(neighbor, 1) + numfam(neighbor, 1) - 1
+            neighborOfNeighbor = nodefam(j, 1);
+            if (isBetween(coord, neighbor, neighborOfNeighbor, testNode) == 1)
+            %if (coord(neighborOfNeighbor,2) > coord(testNode,2))
+                fyA = fyA + (nodefam(j,3));
+            end
+            if (coord(neighborOfNeighbor,2) > coord(testNode,2))
+                fyD = fyD + (nodefam(j,3));
+            end
+        end
+    end
+end
+T = Deltas(testNode,1) / 3.015;
+stressA(testNode,1) = fyA * T / Applied_pressure;
+stressD(testNode,1) = fyD * T / Applied_pressure;
+end
+%%
+figure(997)
+subplot(1,2,1);
+sz = 10;
+scatter(coord(:,1), coord(:,2), sz, (stressD(:,1)), 'filled');
+xlabel('x');
+ylabel('y');
+colorbar('southoutside');
+colormap('jet');
+title(['S22 StressD in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+subplot(1,2,2);
+sz = 10;
+scatter(coord(:,1), coord(:,2), sz, (stressA(:,1)), 'filled');
+xlabel('x');
+ylabel('y');
+colorbar('southoutside');
+colormap('jet');
+title(['S22 StressA in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
 
-
-
-
-
-
+%%
+%DONGJUN: STRESS vs MATERIAL POINTS
+figure(6)
+subplot(1,2,1);
+plot(ExtractPathData(path_horizontal, stressD, 1));
+xlabel('Material Points');
+ylabel('S');
+title('S11 stressD');
+subplot(1,2,2);
+plot(ExtractPathData(path_horizontal, stressA, 1));
+xlabel('Material Points');
+ylabel('S');
+title('S22 stressA');
 
 
 
@@ -769,7 +845,7 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
         satisfy_x = 0;
         satisfy_y = 0;
 
-        localThickness = Deltas(1,1) / 3.015 / 2;
+        localThickness = Deltas(1,1) / 3.015;
         point_x = coord(i,1); %% Extract coordinates of point i
         point_y = coord(i,2);
         for j = 1: TotalNumMatPoint %% Iterating every other material point for conditions
