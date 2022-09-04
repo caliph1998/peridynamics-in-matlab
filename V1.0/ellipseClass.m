@@ -1,4 +1,4 @@
-classdef ellipseClass
+classdef EllipseClass
     properties
         x_center
         y_center
@@ -18,5 +18,3 @@ classdef ellipseClass
         end
     end
 end
-
-        

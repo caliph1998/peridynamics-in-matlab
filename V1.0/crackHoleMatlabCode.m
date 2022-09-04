@@ -1,35 +1,40 @@
 close all
 clear all
+%% PARAMETERS REQUIRING USER INPUT
+radiusMajor = 0.05; % Unit: m central hole major radius
+radiusMinor = 0.05; % Unit: m central hole minor radius
+mpLinearDensity = 200; %material points per m
+TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
+
+
+
 %% GEOMETRICAL PARAMETERS
 
 length = 0.5; % Unit: m Plate length
 width = 0.5; % Unit: m Plate width
-radius_a = 0.05; % Unit: m central hole major radius
-radius_b = 0.05; % Unit: m central hole minor radius
-ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
-NumofDiv_y = NumofDiv_x;
-dx = length / NumofDiv_x; %Incremental distance between a material points pair
+ellipseCurvature = radiusMinor ^ 2 / radiusMajor;
+numOfDivX = mpLinearDensity * length; %NumofDiv_x: Number of divisions in x direction
+numOfDivY = numOfDivX;
+dx = 1 / mpLinearDensity; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
-Area = dx * dx; % unit: m^2
-Volume = Area * thick; % unit: m^3 %volume of a single material point
-InitialTotalNumMatPoint = NumofDiv_x*NumofDiv_y;
+area = dx * dx; % minimum rectanble area containing one material point
+volume = area * thick; % unit: m^3 %minimum volume of a cube containing one material point
+InitialTotalNumMatPoint = numOfDivX*numOfDivY; %Initial estimation of number of material points needed
 %% MECHANICAL PROPERTIES
 
-Elastic_Modulus = 200e9; % Unit: N/m^2
-Possion_ratio = 0.3;  
-Applied_pressure = 500e7; % Unit: N/m^2
-Shear_Modulus = Elastic_Modulus / (2 * (1 + Possion_ratio)); 
-Bulk_Modulus = Elastic_Modulus / (2 * (1 - Possion_ratio)); 
+ELASTIC_MODULUS = 200e9; % Unit: N/m^2
+POISSON_RATIO = 0.3;  
+APPLIED_PRESSURE = 500e7; % Unit: N/m^2
+SHEAR_MODULUS = ELASTIC_MODULUS / (2 * (1 + POISSON_RATIO)); 
+BULK_MODULUS = ELASTIC_MODULUS / (2 * (1 - POISSON_RATIO)); 
 %% PERIDYNAMICS PARAMETERS
 
 delta = 3.015 * dx; % Unit: m horizon size: a peridynamics (PD) parameter
-VolCorr_radius = dx / 2; % volume correction related number
-alpha=0.5*(Bulk_Modulus-2*Shear_Modulus); % a PD parameter used ONLY in state-based PD
+volumeCorrectionRadius = dx / 2; % volume correction related number
+alpha=0.5*(BULK_MODULUS-2*SHEAR_MODULUS); % a PD parameter used ONLY in state-based PD
 bcd = 2/(pi*thick*delta^3); % a PD parameter referenced in literature as d
-bcs = 6*Shear_Modulus/(pi*thick*delta^4); % a PD parameter referenced in literature as b
-Volume_Horizon = pi * delta ^ 2 * thick; % The volume of the spherical horzion of each material point
-neighborsPerNode = floor(pi * delta ^ 2 / Area);
+bcs = 6*SHEAR_MODULUS/(pi*thick*delta^4); % a PD parameter referenced in literature as b
+neighborsPerNode = floor(pi * delta ^ 2 / area);
 totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode * 100;
 nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
 %% OTHER PARAMTETERS
@@ -38,25 +43,24 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %model.
 warning('TODO: TimeInterval variable should be automatically approximated by the model.');
 dt = 1; % time unit (s)
-TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
-tip_radius = radius_a;
+tip_radius = radiusMajor;
 %dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
-dxDense = dx / 2;
+dxDenseArea = dx / 2;
 %dx_tip = 6.25e-04;
 %% DEFINING THE TIPS AND THE ELLIPSE HOLE REGIONS USING CLASS ELLIPSECLASS
 
-% Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
-center_hole = ellipseClass(0, 0, radius_a, radius_b / 4);
-left_tip = ellipseClass(0, 0, radius_a * 2 * 0 , radius_a * 2 * 0 ); %if major and minor radii are equal => circle.
-right_tip = ellipseClass(radius_a, 0, 0, 0);
+% Constructor: EllipseClass(x_origin, y_origin_, major radius, minor radius);
+center_hole = EllipseClass(0, 0, radiusMajor, radiusMinor / 4);
+left_tip = EllipseClass(0, 0, radiusMajor * 2 * 0 , radiusMajor * 2 * 0 ); %if major and minor radii are equal => circle.
+right_tip = EllipseClass(radiusMajor, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
 %TODO:Build an interface for desired inputs.
 warning('TODO:Build an interface for desired inputs.');
-[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
+[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, InitialTotalNumMatPoint, center_hole);
 %[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
 
 
@@ -71,11 +75,11 @@ for i = 1: numOfRemoteMPs
 end
 
 for i = numOfRemoteMPs+1: totalNumMatPoint
-    Deltas(i, 1) = 3.015 * dxDense;
+    Deltas(i, 1) = 3.015 * dxDenseArea;
 end
 
 for i = 1:totalNumMatPoint
-    BCS(i, 1) = 6*Shear_Modulus/(pi*thick*Deltas(i,1)^4);
+    BCS(i, 1) = 6*SHEAR_MODULUS/(pi*thick*Deltas(i,1)^4);
     BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
 end
 
@@ -172,9 +176,9 @@ end
 
 for i = 1:totalNumMatPoint
     if (coord(i,2) == min(coord(:,2))) %applying force to the lower edge
-        BodyForce(i,2) = (-1) * Applied_pressure/dx;
+        BodyForce(i,2) = (-1) * APPLIED_PRESSURE/dx;
     elseif(coord(i,2) == max(coord(:,2)))%applying force to the upper edge
-        BodyForce(i,2) =  Applied_pressure/dx; 
+        BodyForce(i,2) =  APPLIED_PRESSURE/dx; 
     end
 end
 %{
@@ -240,11 +244,11 @@ time = tt
          Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1));
          Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
          Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
-         VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
-            if (RelativePosition_Vector <= Deltas(i,1)-VolCorr_radius) 
+         volumeCorrectionRadius = Deltas(cnode,1) / 3.015 / 2;
+            if (RelativePosition_Vector <= Deltas(i,1)-volumeCorrectionRadius) 
             fac = 1;
-            elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius && RelativePosition_Vector > Deltas(i,1)-VolCorr_radius )
-            fac = (Deltas(i,1)+VolCorr_radius-RelativePosition_Vector)/(2*VolCorr_radius);
+            elseif (RelativePosition_Vector <= Deltas(i,1)+volumeCorrectionRadius && RelativePosition_Vector > Deltas(i,1)-volumeCorrectionRadius )
+            fac = (Deltas(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius);
             else
             fac = 0;
             end
@@ -264,11 +268,11 @@ time = tt
 
             %Critic stretch if statement is deactivated as it is unused
             %if (failm(i,j)==1) 
-            Volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
+            volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
             bcs = BCS(i,1);
             bcd = BCD(i,1);
             
-            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + BCD(i,1) * Deltas(i,1) * Stretch * Directional_cosine * Volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
+            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + BCD(i,1) * Deltas(i,1) * Stretch * Directional_cosine * volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
             %else
             %PD_SED_dilatation_Fixed(i,1) = 0;
             %end                                             
@@ -288,11 +292,11 @@ for i = 1:totalNumMatPoint
     Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1)); %(C'x - Cx)(Cx-Ax)
     Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2)); %(C'y - Cy)(Cy-Ay)
         Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;%Some weird constant that will be used in bond_constant calculations.
-        VolCorr_radius = Deltas(cnode,1) / 3.015 / 2;
-        if (RelativePosition_Vector <= Deltas(i,1)-VolCorr_radius) %if all the way inside the horizon
+        volumeCorrectionRadius = Deltas(cnode,1) / 3.015 / 2;
+        if (RelativePosition_Vector <= Deltas(i,1)-volumeCorrectionRadius) %if all the way inside the horizon
          fac = 1;
-        elseif (RelativePosition_Vector <= Deltas(i,1)+VolCorr_radius) %if partially inside the A horizon
-         fac = (Deltas(i,1)+VolCorr_radius-RelativePosition_Vector)/(2*VolCorr_radius); %VolCorr_radius = dx / 2
+        elseif (RelativePosition_Vector <= Deltas(i,1)+volumeCorrectionRadius) %if partially inside the A horizon
+         fac = (Deltas(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius); %VolCorr_radius = dx / 2
         else
          fac = 0; %Unnecassary else since it will never happen
          error("fac2");
@@ -327,9 +331,9 @@ for i = 1:totalNumMatPoint
 %For points with smaller horizon, this doesn't make a difference, but it
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
-        Volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
+        volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
         bondForce_const = (2 * BCD(i,1)*Deltas(i,1) * alpha / RelativePosition_Vector * Directional_cosine * PD_SED_dilatation_Fixed(i,1)  + ...
-                      2 * BCS(i,1)*Deltas(i,1) * Stretch * SurCorrFactor_Arbitrary_distorsion) * Volume * fac / RelativeDisp_Vector;
+                      2 * BCS(i,1)*Deltas(i,1) * Stretch * SurCorrFactor_Arbitrary_distorsion) * volume * fac / RelativeDisp_Vector;
         %The point of the two lines below is to split the force vector into its components.
         %But it needs to be divided by RelativeDisp_Vector which is done in
         %the above line which is unclear and confusing.
@@ -340,13 +344,13 @@ for i = 1:totalNumMatPoint
         PDforce(i,2) = PDforce(i,2) + directForce_y;
         
         
-        reactionaryForce_x = directForce_x / (Volume * fac);
-        reactionaryForce_y = directForce_y / (Volume * fac);
+        reactionaryForce_x = directForce_x / (volume * fac);
+        reactionaryForce_y = directForce_y / (volume * fac);
         
         
-        Volume = (Deltas(i,1) / 3.015) ^ 2 * thick;
-        reactionaryForce_x = reactionaryForce_x * (Volume * fac);
-        reactionaryForce_y = reactionaryForce_y * (Volume * fac);
+        volume = (Deltas(i,1) / 3.015) ^ 2 * thick;
+        reactionaryForce_x = reactionaryForce_x * (volume * fac);
+        reactionaryForce_y = reactionaryForce_y * (volume * fac);
         
 
 
@@ -520,7 +524,7 @@ end
 
 for node = 1: totalNumMatPoint
     T = Deltas(node,1) / 3.015;
-    stressE(node,1) = stressE(node,1) * T / Applied_pressure;
+    stressE(node,1) = stressE(node,1) * T / APPLIED_PRESSURE;
 end
 %% GETTING THE SAVING ADDRESS FROM THE USER
 
@@ -573,7 +577,7 @@ subplot(1,2,1);
 scatter(coord(:,1), coord(:,2), sz, -abs(disp(:,1)), 'filled');
 xlabel('x');
 ylabel('y');
-title(['U11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+title(['U11 in ', num2str(numOfDivX), ' * ', num2str(numOfDivY)]);
 colorbar('southoutside');
 colormap('jet');
 
@@ -581,7 +585,7 @@ subplot(1,2,2);
 scatter(coord(:,1), coord(:,2), sz, abs(disp(:,2)), 'filled');
 xlabel('x');
 ylabel('y');
-title(['U22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+title(['U22 in ', num2str(numOfDivX), ' * ', num2str(numOfDivY)]);
 colorbar('southoutside');
 colormap('jet');
 
@@ -704,7 +708,7 @@ figureNameNeighbors = '\arrangement.jpeg';
 hold on
 xlabel('x');
 ylabel('y');
-title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(NumofDiv_x), '*', num2str(NumofDiv_x)]);
+title(['Neighbors of Material Point = ', num2str(node), ' in MP density of ' ,num2str(numOfDivX), '*', num2str(numOfDivX)]);
 scatter(coord(:,1), coord(:,2), '.g');
 for j = 1:numfam(node,1)
    cnode = nodefam(pointfam(node,1)+j-1,1);
@@ -836,7 +840,7 @@ xlabel('x');
 ylabel('y');
 colorbar('southoutside');
 colormap('jet');
-title(['S22 StressE in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+title(['S22 StressE in ', num2str(numOfDivX), ' * ', num2str(numOfDivY)]);
 
 saveAndPrintFigure(gcf, address, figureNameStress);
 %%
