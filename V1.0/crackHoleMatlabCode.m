@@ -7,7 +7,7 @@ width = 0.5; % Unit: m Plate width
 radius_a = 0.05; % Unit: m central hole major radius
 radius_b = 0.05; % Unit: m central hole minor radius
 ellipse_curvature = radius_b ^ 2 / radius_a;
-NumofDiv_x = 50; %NumofDiv_x: Number of divisions in x direction
+NumofDiv_x = 100; %NumofDiv_x: Number of divisions in x direction
 NumofDiv_y = NumofDiv_x;
 dx = length / NumofDiv_x; %Incremental distance between a material points pair
 thick = dx; % Unit: m thickness of the plate
@@ -34,8 +34,11 @@ totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode * 100;
 nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
 %% OTHER PARAMTETERS
 
+%TODO: TimeInterval variable should be automatically approximated by the
+%model.
+warning('TODO: TimeInterval variable should be automatically approximated by the model.');
 dt = 1; % time unit (s)
-TimeInterval = 3000; %TimeInterval: Number of time iTimeIntervalervals
+TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
 
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
@@ -46,12 +49,13 @@ dxDense = dx / 2;
 %% DEFINING THE TIPS AND THE ELLIPSE HOLE REGIONS USING CLASS ELLIPSECLASS
 
 % Constructor: ellipseClass(x_origin, y_origin_, major radius, minor radius);
-center_hole = ellipseClass(0, 0, radius_a, radius_b);
+center_hole = ellipseClass(0, 0, radius_a, radius_b / 4);
 left_tip = ellipseClass(0, 0, radius_a * 2 * 0 , radius_a * 2 * 0 ); %if major and minor radii are equal => circle.
 right_tip = ellipseClass(radius_a, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
-
+%TODO:Build an interface for desired inputs.
+warning('TODO:Build an interface for desired inputs.');
 [coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole);
 %[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
 
@@ -103,7 +107,7 @@ fprintf('Large arrays assigned. \n');
 
 
 
-%% COORDINATE DISPLAYS WITH HORIZON FAMILIEDS
+%% NEIGHBOR MEMBER SEARCH ALGORITHM
 tic
 for i = 1:totalNumMatPoint
     
@@ -130,6 +134,8 @@ fprintf('\nNeighbors assigned. \n');
 lastBondIter = pointfam(i,1) + numfam(i,1) - 1; % Used to trim nodefam and to define bondForces array
 %nodefam = nodefam(1:lastBondIter, 1); %Trimming the nodefame to the last non-zero value.
 bondForces = zeros(lastBondIter, 1);
+
+%% SURFACE CURRACTION FACTORING
 
 %Surface correction factor calculation - start
 for i = 1:totalNumMatPoint
@@ -162,7 +168,7 @@ massvec(i,1) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / (Del
 massvec(i,2) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / (Deltas(i,1) / 3.015);
 end
 
-%% APPLYING EXTRA FORCES AND BOUNDARIES
+%% APPLYING EXTRENAL FORCES
 
 for i = 1:totalNumMatPoint
     if (coord(i,2) == min(coord(:,2))) %applying force to the lower edge
@@ -204,15 +210,18 @@ BodyForce(i,1) = Applied_pressure/dx;
 end
 %}
 
-%% MAIN CODE PART
+%% TIME INTEGRATION STEP
 
 %testNode = 555;
 testCoordinates = [tip_radius * 6 / 5, 0];
 testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord);
 
 
-directForces = zeros(100000,4);
-reactForces = zeros(100000,4);
+%One of these lists is redundant. The reason is that for every direct
+%force, there is one reactionary force in equal magnitude in the opposite
+%direction in the other list with even the same array index.
+directForces = zeros(totalNumOfBonds,4);
+reactForces = zeros(totalNumOfBonds,4);
 iterDirect = 1;
 iterReact = 1;
 
@@ -331,20 +340,20 @@ for i = 1:totalNumMatPoint
         PDforce(i,2) = PDforce(i,2) + directForce_y;
         
         
-        directForce_x = directForce_x / (Volume * fac);
-        directForce_y = directForce_y / (Volume * fac);
+        reactionaryForce_x = directForce_x / (Volume * fac);
+        reactionaryForce_y = directForce_y / (Volume * fac);
         
         
         Volume = (Deltas(i,1) / 3.015) ^ 2 * thick;
-        directForce_x = directForce_x * (Volume * fac);
-        directForce_y = directForce_y * (Volume * fac);
+        reactionaryForce_x = reactionaryForce_x * (Volume * fac);
+        reactionaryForce_y = reactionaryForce_y * (Volume * fac);
         
 
 
         
         
-        reactionaryForce_x = (-1) * directForce_x;
-        reactionaryForce_y = (-1) * directForce_y;
+        reactionaryForce_x = (-1) * reactionaryForce_x;
+        reactionaryForce_y = (-1) * reactionaryForce_y;
         PDforce(cnode,1) = PDforce(cnode,1) + reactionaryForce_x;     
         PDforce(cnode,2) = PDforce(cnode,2) + reactionaryForce_y;
         
@@ -380,8 +389,11 @@ for i = 1:totalNumMatPoint
            
     end
 end
+%% Cutting the force lists to remove excess rows
+directForces = directForces(1:iterDirect-1,:);
+reactForces = reactForces(1:iterReact-1,:);
 
-
+%%
 %%% Getting steady-state solutions through Adaptive Dynamic relaxation %%%
 cn1 = 0;
 cn2 = 0;
@@ -443,11 +455,73 @@ toc
 
 % 50*40 +(25+12) = 2037
 %%
-Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,nodefam, pointfam, Deltas);
+%Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,nodefam, pointfam, Deltas);
 unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
 unpunched_d = unpunched_d * (-1);
 normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
+%%
+%Diffenece with stressE: only neighbors are considered if below.
+stressE = zeros(totalNumMatPoint, 1);
+for i = 1 : size(directForces, 1)
+    if (coord(directForces(i,2), 2) > coord(directForces(i,1), 2))
+        stressE(directForces(i,1),1) = stressE(directForces(i,1),1) + directForces(i,4);
+    end
+end
+for i = 1 : size(reactForces, 1)
+    if (coord(reactForces(i,2), 2) > coord(reactForces(i,1), 2))
+        stressE(reactForces(i,1), 1) = stressE(reactForces(i,1),1) + reactForces(i,4);
+    end
+end
 
+
+for i = 1 : totalNumMatPoint
+    for l = pointfam(i, 1) : pointfam(i, 1) + numfam(i, 1) - 1
+        j = nodefam(l,1);
+        if (coord(j,2) < coord(i,2))
+            if (coord(j,1) == coord(i,1))
+                for k = 1 : size(directForces, 1)
+                    if(directForces(k,1) == j && coord(directForces(k,2), 2) > coord(i, 2))
+                        stressE(i, 1) = stressE(i,1) + directForces(k,4);
+                    end
+                    if(reactForces(k,1) == j && coord(reactForces(k,2), 2) > coord(i,2))
+                        stressE(i, 1) = stressE(i,1) + reactForces(k,4);
+                    end
+                end
+            %note to future self: remember to use get_closest_point for
+            %stress calculation in stressE and stressD  even.
+            elseif (Deltas(j,1) > Deltas(i,1) && coord(j,1) < coord(i,1))
+                rPortion = (coord(i,1) - coord(j,1)) / (Deltas(j,1) / 3.015);
+                lPortion = 1 - rPortion;
+                rMP = get_closest_point(coord(j,1) + Deltas(j,1) / 3.015, coord(j,2), coord);
+                for k = 1 : size(directForces, 1) %could use switch here
+                    if(directForces(k,1) == j && coord(directForces(k,2), 2) > coord(i, 2))
+                        stressE(i, 1) = stressE(i,1) + directForces(k,4) * lPortion;
+                    end
+%                     if(reactForces(k,1) == j && coord(reactForces(k,2), 2) > coord(i,2))
+%                         stressE(i, 1) = stressE(i,1) + reactForces(k,4) * lPortion;
+%                     end
+                    if(directForces(k,2) == j && coord(reactForces(k,1), 2) > coord(i,2))
+                        stressE(i,1) = stressE(i,1) - directForces(k,4) * lPortion;
+                    end
+                    if(directForces(k,1)                  == rMP && coord(directForces(k,2), 2) > coord(i, 2))
+                        stressE(i, 1) = stressE(i,1) + directForces(k,4) * rPortion;
+                    end
+%                     if(reactForces(k,1) == rMP && coord(reactForces(k,2), 2) > coord(i,2))
+%                         stressE(i, 1) = stressE(i,1) + reactForces(k,4) * rPortion;
+%                     end
+                    if(directForces(k,2) == rMP && coord(directForces(k,1), 2) > coord(i,2))
+                        stressE(i,1) = stressE(i,1) - directForces(k,4) * rPortion;
+                    end
+                end
+            end
+        end
+    end
+end
+
+for node = 1: totalNumMatPoint
+    T = Deltas(node,1) / 3.015;
+    stressE(node,1) = stressE(node,1) * T / Applied_pressure;
+end
 %% GETTING THE SAVING ADDRESS FROM THE USER
 
 while 1 == 1
@@ -512,76 +586,76 @@ colorbar('southoutside');
 colormap('jet');
 
 saveAndPrintFigure(gcf, address, figureNameDisp);
-%% STRESS FIELD
-figure(3)
-figureNameStress = '\stressXXYY(INCORRECT).jpeg';
-sz = 10;
-subplot(1,2,1);
-scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)), 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-subplot(1,2,2);
-scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)), 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-
-saveAndPrintFigure(gcf, address, figureNameStress);
-%% NORMAL STRESS FIELD
-figure(4)
-figureNameStress = '\stressXXYYNormal(INCORRECT).jpeg';
-sz = 10;
-subplot(1,2,1);
-scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)) / Applied_pressure, 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-subplot(1,2,2);
-scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)) / Applied_pressure, 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-
-saveAndPrintFigure(gcf, address, figureNameStress);
-%% DONGJUN: STRESS vs NORMALIZED DISTANCE
-figure(5)
-figureNameStressPathNorm = '\stressPathNorm.jpeg';
-subplot(1,2,1);
-ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
-plot(normal_path_horizontal, ssx);
-xlabel('Material Points');
-ylabel('S');
-title('S11 in the horizontal edge');
-subplot(1,2,2);
-ssy = ExtractPathData(path_horizontal, Dongjun_hole_stress, 2);
-plot(normal_path_horizontal, ssy);
-xlabel('Material Points');
-ylabel('S');
-title('S22 in the horizontal edge');
-saveAndPrintFigure(gcf, address, figureNameStressPathNorm);
-%% DONGJUN: STRESS vs MATERIAL POINTS
-figure(6)
-figureNameStressPath = '\stressPath.jpeg';
-subplot(1,2,1);
-plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
-xlabel('Material Points');
-ylabel('S');
-title('S11 in the horizontal edge');
-subplot(1,2,2);
-plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
-xlabel('Material Points');
-ylabel('S');
-title('S22 in the horizontal edge');
-saveAndPrintFigure(gcf, address, figureNameStressPath);
+% %% STRESS FIELD
+% figure(3)
+% %figureNameStress = '\stressXXYY(INCORRECT).jpeg';
+% sz = 10;
+% subplot(1,2,1);
+% scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)), 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('jet');
+% title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% subplot(1,2,2);
+% scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)), 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('jet');
+% title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% 
+% %saveAndPrintFigure(gcf, address, figureNameStress);
+% %% NORMAL STRESS FIELD
+% figure(4)
+% figureNameStress = '\stressXXYYNormal(INCORRECT).jpeg';
+% sz = 10;
+% subplot(1,2,1);
+% scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,1)) / Applied_pressure, 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('volacno');
+% title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% subplot(1,2,2);
+% scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)) / Applied_pressure, 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('jet');
+% title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% 
+% saveAndPrintFigure(gcf, address, figureNameStress);
+% %% DONGJUN: STRESS vs NORMALIZED DISTANCE
+% figure(5)
+% %figureNameStressPathNorm = '\stressPathNorm.jpeg';
+% subplot(1,2,1);
+% ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
+% plot(normal_path_horizontal, ssx);
+% xlabel('Material Points');
+% ylabel('S');
+% title('S11 in the horizontal edge');
+% subplot(1,2,2);
+% ssy = ExtractPathData(path_horizontal, Dongjun_hole_stress, 2);
+% plot(normal_path_horizontal, ssy);
+% xlabel('Material Points');
+% ylabel('S');
+% title('S22 in the horizontal edge');
+% %saveAndPrintFigure(gcf, address, figureNameStressPathNorm);
+% %% DONGJUN: STRESS vs MATERIAL POINTS
+% figure(6)
+% %figureNameStressPath = '\stressPath.jpeg';
+% subplot(1,2,1);
+% plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
+% xlabel('Material Points');
+% ylabel('S');
+% title('S11 in the horizontal edge');
+% subplot(1,2,2);
+% plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
+% xlabel('Material Points');
+% ylabel('S');
+% title('S22 in the horizontal edge');
+% %saveAndPrintFigure(gcf, address, figureNameStressPath);
 %% DISPLACEMENT vs MATERIAL POINTS
 figure(7)
 figureNameDispPath = '\dispPath.jpeg';
@@ -616,13 +690,14 @@ figure(9)
 figureNamePath = '\pathDemonstration.jpeg';
 hold on
 scatter(coord(:,1), coord(:,2), '.g');
+sz = 10;
 scatter(ExtractPathData(path_horizontal, coord, 1), ExtractPathData(path_horizontal, coord, 2), sz + 10, '.b');
 hold off
 
 saveAndPrintFigure(gcf, address, figureNamePath);
 %% DEMONSTRATION OF NEIGHBORS
 
-node = 2798;
+node = get_closest_point(0.12,-0.135,coord);
 sz = 50;
 figure(10)
 figureNameNeighbors = '\arrangement.jpeg';
@@ -641,67 +716,140 @@ hold off
 
 saveAndPrintFigure(gcf, address, figureNameNeighbors);
 %%
-stressD = zeros(totalNumMatPoint, 1);
-stressA = zeros(totalNumMatPoint, 1);
-for testNode = 1:totalNumMatPoint
-fyA = 0;
-fyD = 0;
-for i = pointfam(testNode, 1) : pointfam(testNode, 1) + numfam(testNode, 1) - 1
-    neighbor = nodefam(i, 1);
-    if (coord(neighbor,2) > coord(testNode,2))
-        fyA = fyA + (nodefam(i,3));
-        fyD = fyD + (nodefam(i,3));
-    elseif (coord(neighbor,1) == coord(testNode,1))
-        for j = pointfam(neighbor,1) : pointfam(neighbor, 1) + numfam(neighbor, 1) - 1
-            neighborOfNeighbor = nodefam(j, 1);
-            if (isBetween(coord, neighbor, neighborOfNeighbor, testNode) == 1)
-            %if (coord(neighborOfNeighbor,2) > coord(testNode,2))
-                fyA = fyA + (nodefam(j,3));
-            end
-            if (coord(neighborOfNeighbor,2) > coord(testNode,2))
-                fyD = fyD + (nodefam(j,3));
-            end
-        end
-    end
-end
-T = Deltas(testNode,1) / 3.015;
-stressA(testNode,1) = fyA * T / Applied_pressure;
-stressD(testNode,1) = fyD * T / Applied_pressure;
-end
+% stressD = zeros(totalNumMatPoint, 1);
+% stressA = zeros(totalNumMatPoint, 1);
+% for testNode = 1:totalNumMatPoint
+% fyA = 0;
+% fyD = 0;
+% for i = pointfam(testNode, 1) : pointfam(testNode, 1) + numfam(testNode, 1) - 1
+%     neighbor = nodefam(i, 1);
+%     if (coord(neighbor,2) > coord(testNode,2))
+%         fyA = fyA + (nodefam(i,3));
+%         fyD = fyD + (nodefam(i,3));
+% 
+%     elseif (coord(neighbor,1) == coord(testNode,1))
+%         for j = pointfam(neighbor,1) : pointfam(neighbor, 1) + numfam(neighbor, 1) - 1
+%             neighborOfNeighbor = nodefam(j, 1);
+%             if (isBetween(coord, neighbor, neighborOfNeighbor, testNode) == 1)
+%             %if (coord(neighborOfNeighbor,2) > coord(testNode,2))
+%                 fyA = fyA + (nodefam(j,3));
+%             end
+%             if (coord(neighborOfNeighbor,2) > coord(testNode,2))
+%                 fyD = fyD + (nodefam(j,3));
+%             end
+%         end
+%     end
+% end
+% T = Deltas(testNode,1) / 3.015;
+% stressA(testNode,1) = fyA * T / Applied_pressure;
+% stressD(testNode,1) = fyD * T / Applied_pressure;
+% end
+%%
+% All the forces in the y direction applied to All the material points with
+% x= x0 and y <= y0 is sigmaY for x0,y0
+% Wrong: all NEIGHBOR forces to all material points with x = x0 and y <=y0
+% Wrong: all forces to all NEIGHBOR material points to MP x = x0 when y <= y0;
+% i.e. don't bother with neighbor stuff. just sum the forces up.
+% we expect the problem of no MP being x=x0 below you to still persist
+% here, causing zebra-pattern stress field at the boundaries between the
+% dense and the remote areas for the dense MPs.
+
+% stressC = zeros(totalNumMatPoint, 1);
+% for i = 1 : size(directForces, 1)
+%     if (coord(directForces(i,2), 2) > coord(directForces(i,1), 2))
+%         stressC(directForces(i,1),1) = stressC(directForces(i,1),1) + directForces(i,4);
+%     end
+% end
+% for i = 1 : size(reactForces, 1)
+%     if (coord(reactForces(i,2), 2) > coord(reactForces(i,1), 2))
+%         stressC(reactForces(i,1), 1) = stressC(reactForces(i,1),1) + reactForces(i,4);
+%     end
+% end
+% 
+% 
+% for i = 1 : totalNumMatPoint
+%     for j = 1: totalNumMatPoint
+%         if (coord(j,2) < coord(i,2))
+%             if(coord(j,1) == coord(i,1))
+%                 for k = 1 : size(directForces, 1)
+%                     if(directForces(k,1) == j && coord(directForces(k,2), 2) > coord(i, 2))
+%                         stressC(i, 1) = stressC(i,1) + directForces(k,4);
+%                     end
+%                     if(reactForces(k,1) == j && coord(reactForces(k,2), 2) > coord(i,2))
+%                         stressC(i, 1) = stressC(i,1) + reactForces(k,4);
+%                     end
+%                 end
+%             elseif (Deltas(j,1) > Deltas(i,1) && coord(j,1) < coord(i,1))
+%                     rPortion = (coord(i,1) - coord(j,1)) / (Deltas(j,1) / 3.015);
+%                     lPortion = 1 - rPortion;
+%                     rMP = get_closest_point(coord(j,1) + Deltas(j,1) / 3.015, coord(j,2), coord);
+%                     for k = 1 : size(directForces, 1) %could use switch here
+%                         if(directForces(k,1) == j && coord(directForces(k,2), 2) > coord(i, 2))
+%                             stressC(i, 1) = stressC(i,1) + directForces(k,4) * lPortion;
+%                         end
+%                         if(reactForces(k,1) == j && coord(reactForces(k,2), 2) > coord(i,2))
+%                             stressC(i, 1) = stressC(i,1) + reactForces(k,4) * lPortion;
+%                         end
+%                         if(directForces(k,1) == rMP && coord(directForces(k,2), 2) > coord(i, 2))
+%                             stressC(i, 1) = stressC(i,1) + directForces(k,4) * rPortion;
+%                         end
+%                         if(reactForces(k,1) == rMP && coord(reactForces(k,2), 2) > coord(i,2))
+%                             stressC(i, 1) = stressC(i,1) + reactForces(k,4) * rPortion;
+%                         end
+%                     end
+%             end
+%         end
+%     end
+% end
+% 
+% for node = 1: totalNumMatPoint
+%     T = Deltas(node,1) / 3.015;
+%     stressC(node,1) = stressC(node,1) * T / Applied_pressure;
+% end
+
+    
 %%
 figure(997)
-subplot(1,2,1);
-sz = 10;
-scatter(coord(:,1), coord(:,2), sz, (stressD(:,1)), 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S22 StressD in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
-subplot(1,2,2);
-sz = 10;
-scatter(coord(:,1), coord(:,2), sz, (stressA(:,1)), 'filled');
-xlabel('x');
-ylabel('y');
-colorbar('southoutside');
-colormap('jet');
-title(['S22 StressA in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+figureNameStress = '\stressXXYY.jpeg';
 
+% subplot(1,3,1);
+% sz = 10;
+% scatter(coord(:,1), coord(:,2), sz, (stressD(:,1)), 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('jet');
+% title(['S22 StressD in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% subplot(1,3,2);
+% sz = 10;
+% scatter(coord(:,1), coord(:,2), sz, (stressC(:,1)), 'filled');
+% xlabel('x');
+% ylabel('y');
+% colorbar('southoutside');
+% colormap('jet');
+% title(['S22 StressC in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% subplot(1,3,3);
+sz = 5;
+scatter(coord(:,1), coord(:,2), sz, (stressE(:,1)), 'filled');
+pbaspect([1 1 1])
+xlabel('x');
+ylabel('y');
+colorbar('southoutside');
+colormap('jet');
+title(['S22 StressE in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+
+saveAndPrintFigure(gcf, address, figureNameStress);
 %%
 %DONGJUN: STRESS vs MATERIAL POINTS
 figure(6)
-subplot(1,2,1);
-plot(ExtractPathData(path_horizontal, stressD, 1));
+figureNameStressPathNorm = '\stressPathNormYY.jpeg';
+stressOnPath = ExtractPathData(path_horizontal, stressE, 1);
+plot(normal_path_horizontal, stressOnPath);
 xlabel('Material Points');
 ylabel('S');
-title('S11 stressD');
-subplot(1,2,2);
-plot(ExtractPathData(path_horizontal, stressA, 1));
-xlabel('Material Points');
-ylabel('S');
-title('S22 stressA');
-
-
+title('S22 stressE');
+saveAndPrintFigure(gcf, address, figureNameStressPathNorm);
+%%
 
 
 
@@ -868,9 +1016,9 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
                         end
                     end
             end
-            stress_x = f_x * localThickness;
+            stress_x = f_x * l;
              
-            stress_y = f_y * localThickness;
+            stress_y = f_y * l;
         end
         %Saving the stress for point i before moving on to the next point
         %on the plate
@@ -885,7 +1033,10 @@ NumofDiv_y = NumofDiv_x;
 path = [];
 coord_excess = zeros(matPointNum, 2);
 counter = 0; % a counter used in defining coordinates of each material point
-
+local_start_yy = (-1) * width / 4;
+%TODO: Fix the dependency of the width of the local area with its density
+%in generateBarDense.
+warning('TODO: Fix the dependency of the width of the local area with its density in generateBarDense.');
 for i = 1:NumofDiv_x
     for j = 1:NumofDiv_y
       coordx = -1/2*length + (dx/2) + (i - 1)*dx;
@@ -894,7 +1045,7 @@ for i = 1:NumofDiv_x
       %Applying the hole in the plate (can be deactivated by commenting the
       %if statement below%
       
-      if (coordy > -0.125 && coordy < 0.125)
+      if (coordy > local_start_yy && coordy < (-1) * local_start_yy)
           continue
           %nullpoint(nnum,1) = 0;
       end
@@ -911,19 +1062,19 @@ end
 
 coord_excess = coord_excess(1:counter, :); %coord_excess is trimmed here once
 numOfRemoteMPs = counter;
-middle_width = width / 2;
+
 for i = 1:NumofDiv_x * 2 - 1
     for j = 1:NumofDiv_y
         
       coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
-      coordy = -1/2*middle_width + (dxDense/2) + (j - 1)*dxDense;
+      coordy = local_start_yy + (dxDense/2) + (j - 1)*dxDense;
       
      if (center_hole.inEllipse(coordx, coordy))
           continue
           %nullpoint(nnum,1) = 0;
      end
      
-     if ( abs(coordy) <= dxDense && coordx >= 0 && coordy > 0)
+     if ( abs(coordy) <= dxDense && coordx >= 0 && coordy >= 0)
           path(end+1) = counter + 1;
      end
       counter = counter + 1;
