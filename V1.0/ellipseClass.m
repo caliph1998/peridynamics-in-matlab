@@ -6,7 +6,7 @@ classdef EllipseClass
         radius_minor
     end
     methods
-        function obj = ellipseClass(x, y, R, r)
+        function obj = EllipseClass(x, y, R, r)
             obj.x_center = x;
             obj.y_center = y;
             obj.radius_major = R;

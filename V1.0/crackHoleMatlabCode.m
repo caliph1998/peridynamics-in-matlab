@@ -1,24 +1,47 @@
 close all
 clear all
 %% PARAMETERS REQUIRING USER INPUT
-radiusMajor = 0.05; % Unit: m central hole major radius
-radiusMinor = 0.05; % Unit: m central hole minor radius
-mpLinearDensity = 200; %material points per m
-TimeInterval = 6000; %TimeInterval: Number of time iTimeIntervalervals
+prompt = {'Does the plate have a center hole? enter yes or no:'};
+definput = {'yes'};
+dlgtitle = 'Set the geometrical variables';
+dims = [1];
+answer = inputdlg(prompt,dlgtitle, dims, definput);
+if (strcmp(answer{1},'yes') == true)
+    prompt = {'radM','radm','mpDense','timeInterval','isBarDense','denseRatio'};
+    definput = {'0.05','0.05','100','1500','true','2'};
+    answer = inputdlg(prompt, dlgtitle, dims, definput);
+    answer = cell2struct(answer, prompt);
+    radiusMajor = str2double(answer.radM); % Unit: m central hole major radius
+    radiusMinor = str2double(answer.radm); % Unit: m central hole minor radius
+else
+    prompt = {'mpDense','timeInterval','isBarDense','denseRatio'};
+    definput = {'100','1500','true','2'};
+    answer = inputdlg(prompt, dlgtitle, dims, definput);
+    answer = cell2struct(answer, prompt);
+    radiusMajor = 0;
+    radiusMinor = 0;
+end
+mpLinearDensity = str2double(answer.mpDense); %material points per m
+TimeInterval = str2double(answer.timeInterval); %TimeInterval: Number of time iTimeIntervalervals
+denseAreaRatio = str2double(answer.denseRatio);
 
+if(strcmp(answer.isBarDense, 'true'))
+    isBarDense = true; %To determine whether to use BarDense or CircleDense
+else
+    isBarDense = false;
+end
 
 
 %% GEOMETRICAL PARAMETERS
 
 length = 0.5; % Unit: m Plate length
 width = 0.5; % Unit: m Plate width
-ellipseCurvature = radiusMinor ^ 2 / radiusMajor;
 numOfDivX = mpLinearDensity * length; %NumofDiv_x: Number of divisions in x direction
 numOfDivY = numOfDivX;
 dx = 1 / mpLinearDensity; %Incremental distance between a material points pair
-thick = dx; % Unit: m thickness of the plate
-area = dx * dx; % minimum rectanble area containing one material point
-volume = area * thick; % unit: m^3 %minimum volume of a cube containing one material point
+THICK = dx; % Unit: m thickness of the plate
+AREA = dx * dx; % minimum rectanble area containing one material point
+VOLUME = AREA * THICK; % unit: m^3 %minimum volume of a cube containing one material point
 InitialTotalNumMatPoint = numOfDivX*numOfDivY; %Initial estimation of number of material points needed
 %% MECHANICAL PROPERTIES
 
@@ -32,9 +55,9 @@ BULK_MODULUS = ELASTIC_MODULUS / (2 * (1 - POISSON_RATIO));
 delta = 3.015 * dx; % Unit: m horizon size: a peridynamics (PD) parameter
 volumeCorrectionRadius = dx / 2; % volume correction related number
 alpha=0.5*(BULK_MODULUS-2*SHEAR_MODULUS); % a PD parameter used ONLY in state-based PD
-bcd = 2/(pi*thick*delta^3); % a PD parameter referenced in literature as d
-bcs = 6*SHEAR_MODULUS/(pi*thick*delta^4); % a PD parameter referenced in literature as b
-neighborsPerNode = floor(pi * delta ^ 2 / area);
+bcd = 2/(pi*THICK*delta^3); % a PD parameter referenced in literature as d
+bcs = 6*SHEAR_MODULUS/(pi*THICK*delta^4); % a PD parameter referenced in literature as b
+neighborsPerNode = floor(pi * delta ^ 2 / AREA);
 totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode * 100;
 nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
 %% OTHER PARAMTETERS
@@ -43,44 +66,47 @@ nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neigh
 %model.
 warning('TODO: TimeInterval variable should be automatically approximated by the model.');
 dt = 1; % time unit (s)
-
+dxDenseArea = dx / denseAreaRatio;
 %% DENSE MATERIAL POINT AREA PARAMTERS 
 
-tip_radius = radiusMajor;
+tipRadius = radiusMajor;
 %dx_tip = tip_radius / tipNumOfDiv * 40; %Recommended material point sizes at the crack tips
-dxDenseArea = dx / 2;
+
 %dx_tip = 6.25e-04;
-%% DEFINING THE TIPS AND THE ELLIPSE HOLE REGIONS USING CLASS ELLIPSECLASS
+%% DEFINING THE TIPS AND THE ELLIPSE HOLE REGIONS USING CLASS EllipseClass
 
 % Constructor: EllipseClass(x_origin, y_origin_, major radius, minor radius);
-center_hole = EllipseClass(0, 0, radiusMajor, radiusMinor / 4);
-left_tip = EllipseClass(0, 0, radiusMajor * 2 * 0 , radiusMajor * 2 * 0 ); %if major and minor radii are equal => circle.
-right_tip = EllipseClass(radiusMajor, 0, 0, 0);
+centerHole = EllipseClass(0, 0, radiusMajor, radiusMinor);
+leftTipHole = EllipseClass(0, 0, radiusMajor * 2 , radiusMajor * 2); %if major and minor radii are equal => circle.
+rightTipHole = EllipseClass(radiusMajor, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
 %TODO:Build an interface for desired inputs.
 warning('TODO:Build an interface for desired inputs.');
-[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, InitialTotalNumMatPoint, center_hole);
-%[coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, center_hole, left_tip, right_tip);
+if (isBarDense == true)
+    [coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, InitialTotalNumMatPoint, centerHole);
+else
+    [coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, centerHole, leftTipHole, rightTipHole);
+end
 
 
 %% HORIZON SIZE ASSIGNEMNTS
 
-Deltas = zeros(totalNumMatPoint, 1); %an array holding all material points horizons
-BCS = zeros(totalNumMatPoint, 1); % an array holding bcs of all material points
-BCD = zeros(totalNumMatPoint, 1); % an array holding bcd of al material points
+deltasArray = zeros(totalNumMatPoint, 1); %an array holding all material points horizons
+bcsArray = zeros(totalNumMatPoint, 1); % an array holding bcs of all material points
+bcdArray = zeros(totalNumMatPoint, 1); % an array holding bcd of al material points
 
 for i = 1: numOfRemoteMPs
-    Deltas(i, 1) = delta;
+    deltasArray(i, 1) = delta;
 end
 
 for i = numOfRemoteMPs+1: totalNumMatPoint
-    Deltas(i, 1) = 3.015 * dxDenseArea;
+    deltasArray(i, 1) = 3.015 * dxDenseArea;
 end
 
 for i = 1:totalNumMatPoint
-    BCS(i, 1) = 6*SHEAR_MODULUS/(pi*thick*Deltas(i,1)^4);
-    BCD(i, 1) = 2/(pi*thick*Deltas(i,1)^3);
+    bcsArray(i, 1) = 6*SHEAR_MODULUS/(pi*THICK*deltasArray(i,1)^4);
+    bcdArray(i, 1) = 2/(pi*THICK*deltasArray(i,1)^3);
 end
 
 %% DEFINITION OF NEEDED ARRAYS (COORD_EXCESS IS TRIMMED AT THIS STAGE)
@@ -115,7 +141,7 @@ fprintf('Large arrays assigned. \n');
 tic
 for i = 1:totalNumMatPoint
     
-    delta = Deltas(i,1);
+    delta = deltasArray(i,1);
     if (i == 1) 
     pointfam(i,1) = 1;
     else
@@ -125,7 +151,7 @@ for i = 1:totalNumMatPoint
     for j = 1:totalNumMatPoint
         RelativePosition_Vector = sqrt((coord(j,1) - coord(i,1))^2 + (coord(j,2) - coord(i,2))^2);
         if(i~=j)
-            volCorr_radius = Deltas(j,1) / 3.015 / 2;
+            volCorr_radius = deltasArray(j,1) / 3.015 / 2;
             if(RelativePosition_Vector <= delta )%+ volCorr_radius)
             numfam(i,1) = numfam(i,1) + 1;
             nodefam(pointfam(i,1)+numfam(i,1)-1,1) = j;
@@ -148,14 +174,14 @@ disp(i,2) = 0.0;
 end
 
 %%Surface correction factor calculation - function%%
-[PD_SED_distorsion(:,1),SurCorrFactor_distorsion(:,1),PD_SED_dilatation(:,1), SurCorrFactor_dilatation(:,1)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
+[PD_SED_distorsion(:,1),SurCorrFactor_distorsion(:,1),PD_SED_dilatation(:,1), SurCorrFactor_dilatation(:,1)] = Calculate_SurCorrection(deltasArray,bcsArray,bcdArray,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
 fprintf('\nPD_SEDs  in x direction assigned\n');
     
 for i = 1:totalNumMatPoint
     disp(i,1) = 0;
     disp(i,2) = 0.001 * coord(i,2);
 end
-[PD_SED_distorsion(:,2), SurCorrFactor_distorsion(:,2),PD_SED_dilatation(:,2), SurCorrFactor_dilatation(:,2)] = Calculate_SurCorrection(Deltas,BCS,BCD,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
+[PD_SED_distorsion(:,2), SurCorrFactor_distorsion(:,2),PD_SED_dilatation(:,2), SurCorrFactor_dilatation(:,2)] = Calculate_SurCorrection(deltasArray,bcsArray,bcdArray,disp,totalNumMatPoint,numfam,nodefam,pointfam,coord);
 %Surface correction factor calculation - end
 fprintf('\nPD_SEDs  in y direction assigned\n');
     
@@ -168,8 +194,8 @@ end
 
 %Stable mass vector computation
 for i = 1:totalNumMatPoint
-massvec(i,1) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick)  * BCS(i,1) / (Deltas(i,1) / 3.015);
-massvec(i,2) = 1.25 * dt ^ 2 * (pi * (Deltas(i,1))^2 * thick) * BCS(i,1) / (Deltas(i,1) / 3.015);
+massvec(i,1) = 1.25 * dt ^ 2 * (pi * (deltasArray(i,1))^2 * THICK)  * bcsArray(i,1) / (deltasArray(i,1) / 3.015);
+massvec(i,2) = 1.25 * dt ^ 2 * (pi * (deltasArray(i,1))^2 * THICK) * bcsArray(i,1) / (deltasArray(i,1) / 3.015);
 end
 
 %% APPLYING EXTRENAL FORCES
@@ -217,7 +243,7 @@ end
 %% TIME INTEGRATION STEP
 
 %testNode = 555;
-testCoordinates = [tip_radius * 6 / 5, 0];
+testCoordinates = [tipRadius * 6 / 5, 0];
 testNode = get_closest_point(testCoordinates(1,1), testCoordinates(1,2), coord);
 
 
@@ -231,7 +257,9 @@ iterReact = 1;
 
 tic
 for tt = 1:TimeInterval
-time = tt
+%     if (rem(tt, TimeInterval / 10) == 0)
+%        fprintf('Done: %d percent\n',tt / TimeInterval * 100);
+%     end
     
     for i = 1:totalNumMatPoint
     PD_SED_dilatation_Fixed(i,1) = 0;
@@ -244,11 +272,11 @@ time = tt
          Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1));
          Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2));
          Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;
-         volumeCorrectionRadius = Deltas(cnode,1) / 3.015 / 2;
-            if (RelativePosition_Vector <= Deltas(i,1)-volumeCorrectionRadius) 
+         volumeCorrectionRadius = deltasArray(cnode,1) / 3.015 / 2;
+            if (RelativePosition_Vector <= deltasArray(i,1)-volumeCorrectionRadius) 
             fac = 1;
-            elseif (RelativePosition_Vector <= Deltas(i,1)+volumeCorrectionRadius && RelativePosition_Vector > Deltas(i,1)-volumeCorrectionRadius )
-            fac = (Deltas(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius);
+            elseif (RelativePosition_Vector <= deltasArray(i,1)+volumeCorrectionRadius && RelativePosition_Vector > deltasArray(i,1)-volumeCorrectionRadius )
+            fac = (deltasArray(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius);
             else
             fac = 0;
             end
@@ -268,11 +296,11 @@ time = tt
 
             %Critic stretch if statement is deactivated as it is unused
             %if (failm(i,j)==1) 
-            volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
-            bcs = BCS(i,1);
-            bcd = BCD(i,1);
+            VOLUME = (deltasArray(cnode,1) / 3.015) ^ 2 * THICK;
+            bcs = bcsArray(i,1);
+            bcd = bcdArray(i,1);
             
-            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + BCD(i,1) * Deltas(i,1) * Stretch * Directional_cosine * volume * SurCorrFactor_Arbitrary_dilatation * fac;                          
+            PD_SED_dilatation_Fixed(i,1) = PD_SED_dilatation_Fixed(i,1) + bcdArray(i,1) * deltasArray(i,1) * Stretch * Directional_cosine * VOLUME * SurCorrFactor_Arbitrary_dilatation * fac;                          
             %else
             %PD_SED_dilatation_Fixed(i,1) = 0;
             %end                                             
@@ -292,11 +320,11 @@ for i = 1:totalNumMatPoint
     Coeff_x = (coord(cnode,1) + disp(cnode,1) - coord(i,1) - disp(i,1)) * (coord(cnode,1) - coord(i,1)); %(C'x - Cx)(Cx-Ax)
     Coeff_y = (coord(cnode,2) + disp(cnode,2) - coord(i,2) - disp(i,2)) * (coord(cnode,2) - coord(i,2)); %(C'y - Cy)(Cy-Ay)
         Directional_cosine = (Coeff_x + Coeff_y) / AbsoluteValue_x_y;%Some weird constant that will be used in bond_constant calculations.
-        volumeCorrectionRadius = Deltas(cnode,1) / 3.015 / 2;
-        if (RelativePosition_Vector <= Deltas(i,1)-volumeCorrectionRadius) %if all the way inside the horizon
+        volumeCorrectionRadius = deltasArray(cnode,1) / 3.015 / 2;
+        if (RelativePosition_Vector <= deltasArray(i,1)-volumeCorrectionRadius) %if all the way inside the horizon
          fac = 1;
-        elseif (RelativePosition_Vector <= Deltas(i,1)+volumeCorrectionRadius) %if partially inside the A horizon
-         fac = (Deltas(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius); %VolCorr_radius = dx / 2
+        elseif (RelativePosition_Vector <= deltasArray(i,1)+volumeCorrectionRadius) %if partially inside the A horizon
+         fac = (deltasArray(i,1)+volumeCorrectionRadius-RelativePosition_Vector)/(2*volumeCorrectionRadius); %VolCorr_radius = dx / 2
         else
          fac = 0; %Unnecassary else since it will never happen
          error("fac2");
@@ -331,9 +359,9 @@ for i = 1:totalNumMatPoint
 %For points with smaller horizon, this doesn't make a difference, but it
 %does make a difference for the points with the larger horizon at the
 %vicinity of the smaller horzion points.
-        volume = (Deltas(cnode,1) / 3.015) ^ 2 * thick;
-        bondForce_const = (2 * BCD(i,1)*Deltas(i,1) * alpha / RelativePosition_Vector * Directional_cosine * PD_SED_dilatation_Fixed(i,1)  + ...
-                      2 * BCS(i,1)*Deltas(i,1) * Stretch * SurCorrFactor_Arbitrary_distorsion) * volume * fac / RelativeDisp_Vector;
+        VOLUME = (deltasArray(cnode,1) / 3.015) ^ 2 * THICK;
+        bondForce_const = (2 * bcdArray(i,1)*deltasArray(i,1) * alpha / RelativePosition_Vector * Directional_cosine * PD_SED_dilatation_Fixed(i,1)  + ...
+                      2 * bcsArray(i,1)*deltasArray(i,1) * Stretch * SurCorrFactor_Arbitrary_distorsion) * VOLUME * fac / RelativeDisp_Vector;
         %The point of the two lines below is to split the force vector into its components.
         %But it needs to be divided by RelativeDisp_Vector which is done in
         %the above line which is unclear and confusing.
@@ -344,13 +372,13 @@ for i = 1:totalNumMatPoint
         PDforce(i,2) = PDforce(i,2) + directForce_y;
         
         
-        reactionaryForce_x = directForce_x / (volume * fac);
-        reactionaryForce_y = directForce_y / (volume * fac);
+        reactionaryForce_x = directForce_x / (VOLUME * fac);
+        reactionaryForce_y = directForce_y / (VOLUME * fac);
         
         
-        volume = (Deltas(i,1) / 3.015) ^ 2 * thick;
-        reactionaryForce_x = reactionaryForce_x * (volume * fac);
-        reactionaryForce_y = reactionaryForce_y * (volume * fac);
+        VOLUME = (deltasArray(i,1) / 3.015) ^ 2 * THICK;
+        reactionaryForce_x = reactionaryForce_x * (VOLUME * fac);
+        reactionaryForce_y = reactionaryForce_y * (VOLUME * fac);
         
 
 
@@ -493,10 +521,10 @@ for i = 1 : totalNumMatPoint
                 end
             %note to future self: remember to use get_closest_point for
             %stress calculation in stressE and stressD  even.
-            elseif (Deltas(j,1) > Deltas(i,1) && coord(j,1) < coord(i,1))
-                rPortion = (coord(i,1) - coord(j,1)) / (Deltas(j,1) / 3.015);
+            elseif (deltasArray(j,1) > deltasArray(i,1) && coord(j,1) < coord(i,1))
+                rPortion = (coord(i,1) - coord(j,1)) / (deltasArray(j,1) / 3.015);
                 lPortion = 1 - rPortion;
-                rMP = get_closest_point(coord(j,1) + Deltas(j,1) / 3.015, coord(j,2), coord);
+                rMP = get_closest_point(coord(j,1) + deltasArray(j,1) / 3.015, coord(j,2), coord);
                 for k = 1 : size(directForces, 1) %could use switch here
                     if(directForces(k,1) == j && coord(directForces(k,2), 2) > coord(i, 2))
                         stressE(i, 1) = stressE(i,1) + directForces(k,4) * lPortion;
@@ -523,7 +551,7 @@ for i = 1 : totalNumMatPoint
 end
 
 for node = 1: totalNumMatPoint
-    T = Deltas(node,1) / 3.015;
+    T = deltasArray(node,1) / 3.015;
     stressE(node,1) = stressE(node,1) * T / APPLIED_PRESSURE;
 end
 %% GETTING THE SAVING ADDRESS FROM THE USER
@@ -1031,25 +1059,27 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
     end
 end
 
-function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(NumofDiv_x, length, width, dx, dxDense, matPointNum, center_hole)
+function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDense, matPointNum, center_hole)
 
-NumofDiv_y = NumofDiv_x;
+numOfDivY = numOfDivX;
 path = [];
 coord_excess = zeros(matPointNum, 2);
 counter = 0; % a counter used in defining coordinates of each material point
-local_start_yy = (-1) * width / 4;
+localStartY = (-1) * width / 4;
+localStartX = (-1) * localStartY;
+localLength = localStartX - localStartY;
 %TODO: Fix the dependency of the width of the local area with its density
 %in generateBarDense.
 warning('TODO: Fix the dependency of the width of the local area with its density in generateBarDense.');
-for i = 1:NumofDiv_x
-    for j = 1:NumofDiv_y
+for i = 1:numOfDivX
+    for j = 1:numOfDivY
       coordx = -1/2*length + (dx/2) + (i - 1)*dx;
       coordy = -1/2*width + (dx/2) + (j - 1)*dx;
       
       %Applying the hole in the plate (can be deactivated by commenting the
       %if statement below%
       
-      if (coordy > local_start_yy && coordy < (-1) * local_start_yy)
+      if (coordy > localStartY && coordy < (-1) * localStartY)
           continue
           %nullpoint(nnum,1) = 0;
       end
@@ -1066,12 +1096,13 @@ end
 
 coord_excess = coord_excess(1:counter, :); %coord_excess is trimmed here once
 numOfRemoteMPs = counter;
-
-for i = 1:NumofDiv_x * 2 - 1
-    for j = 1:NumofDiv_y
+localNumOfX = (numOfDivX - 1) * dx / dxDense + 1;
+localNumOfY = localLength / dxDense;
+for i = 1:localNumOfX
+    for j = 1:localNumOfY
         
       coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
-      coordy = local_start_yy + (dxDense/2) + (j - 1)*dxDense;
+      coordy = localStartY + (dxDense/2) + (j - 1)*dxDense;
       
      if (center_hole.inEllipse(coordx, coordy))
           continue
