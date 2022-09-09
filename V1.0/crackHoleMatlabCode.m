@@ -29,6 +29,15 @@ if(strcmp(answer.isBarDense, 'true'))
     isBarDense = true; %To determine whether to use BarDense or CircleDense
 else
     isBarDense = false;
+    prompt('denseRadM', 'denseRadm');
+    definput = {num2str(radiusMajor * 2), num2str(radiusMinor * 2)};
+    answer = inputdlg(prompt, dlgtitle, dims, definput);
+    answer = cell2struct(answer, prompt);
+    leftTipMajor = str2double(answer.denseRadM);
+    leftTipMinor = str2double(answer.denseRadm);
+    leftTipHole = EllipseClass(0, 0, leftTipMajor , leftTipMinor); %if major and minor radii are equal => circle.
+
+    
 end
 
 
@@ -36,13 +45,13 @@ end
 
 length = 0.5; % Unit: m Plate length
 width = 0.5; % Unit: m Plate width
-numOfDivX = mpLinearDensity * length; %NumofDiv_x: Number of divisions in x direction
+numOfDivX = mpLinearDensity * length; %numOfDivX: Number of divisions in x direction
 numOfDivY = numOfDivX;
 dx = 1 / mpLinearDensity; %Incremental distance between a material points pair
 THICK = dx; % Unit: m thickness of the plate
 AREA = dx * dx; % minimum rectanble area containing one material point
 VOLUME = AREA * THICK; % unit: m^3 %minimum volume of a cube containing one material point
-InitialTotalNumMatPoint = numOfDivX*numOfDivY; %Initial estimation of number of material points needed
+initNoMPs = numOfDivX*numOfDivY; %Initial estimation of number of material points needed
 %% MECHANICAL PROPERTIES
 
 ELASTIC_MODULUS = 200e9; % Unit: N/m^2
@@ -58,7 +67,7 @@ alpha=0.5*(BULK_MODULUS-2*SHEAR_MODULUS); % a PD parameter used ONLY in state-ba
 bcd = 2/(pi*THICK*delta^3); % a PD parameter referenced in literature as d
 bcs = 6*SHEAR_MODULUS/(pi*THICK*delta^4); % a PD parameter referenced in literature as b
 neighborsPerNode = floor(pi * delta ^ 2 / AREA);
-totalNumOfBonds = InitialTotalNumMatPoint * neighborsPerNode * 100;
+totalNumOfBonds = initNoMPs * neighborsPerNode * 100;
 nodefam = zeros(totalNumOfBonds,3); % Total array allocated to storing the neighbors of every material point and their bondforces
 %% OTHER PARAMTETERS
 
@@ -77,16 +86,15 @@ tipRadius = radiusMajor;
 
 % Constructor: EllipseClass(x_origin, y_origin_, major radius, minor radius);
 centerHole = EllipseClass(0, 0, radiusMajor, radiusMinor);
-leftTipHole = EllipseClass(0, 0, radiusMajor * 2 , radiusMajor * 2); %if major and minor radii are equal => circle.
 rightTipHole = EllipseClass(radiusMajor, 0, 0, 0);
 %% COORDINATE GENERATION FOR EACH MATERIAL POINT
 
 %TODO:Build an interface for desired inputs.
 warning('TODO:Build an interface for desired inputs.');
 if (isBarDense == true)
-    [coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, InitialTotalNumMatPoint, centerHole);
+    [coord, pathHorizontal, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, initNoMPs, centerHole);
 else
-    [coord, path_horizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, InitialTotalNumMatPoint, centerHole, leftTipHole, rightTipHole);
+    [coord, pathHorizontal, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(numOfDivX, length, width, dx, dxDenseArea, initNoMPs, centerHole, leftTipHole, rightTipHole);
 end
 
 
@@ -111,7 +119,7 @@ end
 
 %% DEFINITION OF NEEDED ARRAYS (COORD_EXCESS IS TRIMMED AT THIS STAGE)
 
-path_horizontal = SortPath('hor',path_horizontal, coord); %Sorting horizontal path from head to tail of the path
+pathHorizontal = SortPath('hor',pathHorizontal, coord); %Sorting horizontal path from head to tail of the path
 numfam = zeros(totalNumMatPoint,1); %numfam: Number of family nodes
 pointfam = zeros(totalNumMatPoint,1); %pointfam: Pointer
 PDforce = zeros(totalNumMatPoint,2);%PDforce: Peridynamic force
@@ -254,12 +262,12 @@ directForces = zeros(totalNumOfBonds,4);
 reactForces = zeros(totalNumOfBonds,4);
 iterDirect = 1;
 iterReact = 1;
-
+warning('TODO: Remove either reacForces or directForces is two is redundant');
 tic
 for tt = 1:TimeInterval
-%     if (rem(tt, TimeInterval / 10) == 0)
-%        fprintf('Done: %d percent\n',tt / TimeInterval * 100);
-%     end
+    if (rem(tt, TimeInterval / 10) == 0)
+       fprintf('Done: %d percent\n',tt / TimeInterval * 100);
+    end
     
     for i = 1:totalNumMatPoint
     PD_SED_dilatation_Fixed(i,1) = 0;
@@ -486,11 +494,13 @@ toc
 %time interval iteration ends
 
 % 50*40 +(25+12) = 2037
-%%
-%Dongjun_hole_stress = CalculateStressforPoint(coord,totalNumMatPoint,numfam,nodefam, pointfam, Deltas);
-unpunched_d = coord(path_horizontal(1),1) - coord(path_horizontal(end),1); %Distance from the crack tip to the plate edge
-unpunched_d = unpunched_d * (-1);
-normal_path_horizontal = (coord(path_horizontal,1) - coord(path_horizontal(1),1)) / (unpunched_d); %normalized path distance
+%% SCOPING PATH WITH RESPECT TO CRACK TIP RADIUS
+%
+crackTipCurve = radiusMinor ^ 2 / radiusMajor;
+%unpunched_d = coord(pathHorizontal(1),1) - coord(pathHorizontal(end),1); %Distance from the crack tip to the plate edge
+%unpunched_d = unpunched_d * (-1);
+%normalPathHorizontal = (coord(pathHorizontal,1) - coord(pathHorizontal(1),1)) / (unpunched_d); %normalized path distance
+scopedPathHorizontal = coord(pathHorizontal,1) / crackTipCurve;
 %%
 %Diffenece with stressE: only neighbors are considered if below.
 stressE = zeros(totalNumMatPoint, 1);
@@ -628,14 +638,14 @@ saveAndPrintFigure(gcf, address, figureNameDisp);
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('jet');
-% title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S11 in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % subplot(1,2,2);
 % scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)), 'filled');
 % xlabel('x');
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('jet');
-% title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S22 in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % 
 % %saveAndPrintFigure(gcf, address, figureNameStress);
 % %% NORMAL STRESS FIELD
@@ -648,28 +658,28 @@ saveAndPrintFigure(gcf, address, figureNameDisp);
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('volacno');
-% title(['S11 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S11 in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % subplot(1,2,2);
 % scatter(coord(:,1), coord(:,2), sz, (Dongjun_hole_stress(:,2)) / Applied_pressure, 'filled');
 % xlabel('x');
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('jet');
-% title(['S22 in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S22 in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % 
 % saveAndPrintFigure(gcf, address, figureNameStress);
 % %% DONGJUN: STRESS vs NORMALIZED DISTANCE
 % figure(5)
 % %figureNameStressPathNorm = '\stressPathNorm.jpeg';
 % subplot(1,2,1);
-% ssx = ExtractPathData(path_horizontal, Dongjun_hole_stress, 1);
-% plot(normal_path_horizontal, ssx);
+% ssx = ExtractPathData(pathHorizontal, Dongjun_hole_stress, 1);
+% plot(scopedPathHorizontal, ssx);
 % xlabel('Material Points');
 % ylabel('S');
 % title('S11 in the horizontal edge');
 % subplot(1,2,2);
-% ssy = ExtractPathData(path_horizontal, Dongjun_hole_stress, 2);
-% plot(normal_path_horizontal, ssy);
+% ssy = ExtractPathData(pathHorizontal, Dongjun_hole_stress, 2);
+% plot(scopedPathHorizontal, ssy);
 % xlabel('Material Points');
 % ylabel('S');
 % title('S22 in the horizontal edge');
@@ -678,12 +688,12 @@ saveAndPrintFigure(gcf, address, figureNameDisp);
 % figure(6)
 % %figureNameStressPath = '\stressPath.jpeg';
 % subplot(1,2,1);
-% plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 1));
+% plot(ExtractPathData(pathHorizontal, Dongjun_hole_stress, 1));
 % xlabel('Material Points');
 % ylabel('S');
 % title('S11 in the horizontal edge');
 % subplot(1,2,2);
-% plot(ExtractPathData(path_horizontal, Dongjun_hole_stress, 2));
+% plot(ExtractPathData(pathHorizontal, Dongjun_hole_stress, 2));
 % xlabel('Material Points');
 % ylabel('S');
 % title('S22 in the horizontal edge');
@@ -692,12 +702,12 @@ saveAndPrintFigure(gcf, address, figureNameDisp);
 figure(7)
 figureNameDispPath = '\dispPath.jpeg';
 subplot(1,2,1);
-plot((ExtractPathData(path_horizontal, disp, 1)));
+plot((ExtractPathData(pathHorizontal, disp, 1)));
 xlabel('Material Points');
 ylabel('U');
 title('U11 in the horizontal edge');
 subplot(1,2,2);
-plot(abs(ExtractPathData(path_horizontal, disp, 2)));
+plot(abs(ExtractPathData(pathHorizontal, disp, 2)));
 xlabel('Material Points');
 ylabel('U');
 title('U22 in the horizontal edge');
@@ -723,7 +733,7 @@ figureNamePath = '\pathDemonstration.jpeg';
 hold on
 scatter(coord(:,1), coord(:,2), '.g');
 sz = 10;
-scatter(ExtractPathData(path_horizontal, coord, 1), ExtractPathData(path_horizontal, coord, 2), sz + 10, '.b');
+scatter(ExtractPathData(pathHorizontal, coord, 1), ExtractPathData(pathHorizontal, coord, 2), sz + 10, '.b');
 hold off
 
 saveAndPrintFigure(gcf, address, figureNamePath);
@@ -851,7 +861,7 @@ figureNameStress = '\stressXXYY.jpeg';
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('jet');
-% title(['S22 StressD in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S22 StressD in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % subplot(1,3,2);
 % sz = 10;
 % scatter(coord(:,1), coord(:,2), sz, (stressC(:,1)), 'filled');
@@ -859,7 +869,7 @@ figureNameStress = '\stressXXYY.jpeg';
 % ylabel('y');
 % colorbar('southoutside');
 % colormap('jet');
-% title(['S22 StressC in ', num2str(NumofDiv_x), ' * ', num2str(NumofDiv_y)]);
+% title(['S22 StressC in ', num2str(numOfDivX), ' * ', num2str(NumofDiv_y)]);
 % subplot(1,3,3);
 sz = 5;
 scatter(coord(:,1), coord(:,2), sz, (stressE(:,1)), 'filled');
@@ -875,8 +885,8 @@ saveAndPrintFigure(gcf, address, figureNameStress);
 %DONGJUN: STRESS vs MATERIAL POINTS
 figure(6)
 figureNameStressPathNorm = '\stressPathNormYY.jpeg';
-stressOnPath = ExtractPathData(path_horizontal, stressE, 1);
-plot(normal_path_horizontal, stressOnPath);
+stressOnPath = ExtractPathData(pathHorizontal, stressE, 1);
+plot(scopedPathHorizontal, stressOnPath);
 xlabel('Material Points');
 ylabel('S');
 title('S22 stressE');
@@ -1059,13 +1069,13 @@ function [stress] = CalculateStressforPoint(coord,TotalNumMatPoint,numfam,nodefa
     end
 end
 
-function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDense, matPointNum, center_hole)
+function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateBarDense(numOfDivX, length, width, dx, dxDenseArea, matPointNum, center_hole)
 
 numOfDivY = numOfDivX;
 path = [];
 coord_excess = zeros(matPointNum, 2);
 counter = 0; % a counter used in defining coordinates of each material point
-localStartY = (-1) * width / 4;
+localStartY = (-1) * width / 10;
 localStartX = (-1) * localStartY;
 localLength = localStartX - localStartY;
 %TODO: Fix the dependency of the width of the local area with its density
@@ -1096,20 +1106,20 @@ end
 
 coord_excess = coord_excess(1:counter, :); %coord_excess is trimmed here once
 numOfRemoteMPs = counter;
-localNumOfX = (numOfDivX - 1) * dx / dxDense + 1;
-localNumOfY = localLength / dxDense;
+localNumOfX = (numOfDivX - 1) * dx / dxDenseArea + 1;
+localNumOfY = localLength / dxDenseArea;
 for i = 1:localNumOfX
     for j = 1:localNumOfY
         
-      coordx = -1/2*length + dx / 2 +  (i - 1)*dxDense;
-      coordy = localStartY + (dxDense/2) + (j - 1)*dxDense;
+      coordx = -1/2*length + dx / 2 +  (i - 1)*dxDenseArea;
+      coordy = localStartY + (dxDenseArea/2) + (j - 1)*dxDenseArea;
       
      if (center_hole.inEllipse(coordx, coordy))
           continue
           %nullpoint(nnum,1) = 0;
      end
      
-     if ( abs(coordy) <= dxDense && coordx >= 0 && coordy >= 0)
+     if ( abs(coordy) <= dxDenseArea && coordx >= 0 && coordy >= 0)
           path(end+1) = counter + 1;
      end
       counter = counter + 1;
@@ -1124,13 +1134,26 @@ totalNumMatPoint = size(coord, 1);
 
 end
 
-function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(NumofDiv_x, length, width, dx, dxDense, matPointNum, center_hole, left_tip, right_tip)
-NumofDiv_y = NumofDiv_x;
+
+
+
+
+
+
+
+
+
+
+
+
+
+function [coord, path, numOfRemoteMPs, totalNumMatPoint] = generateCircleDense(numOfDivX, length, width, dx, dxDenseArea, matPointNum, center_hole, left_tip, right_tip)
+NumofDiv_y = numOfDivX;
 path = [];
 coord_excess = zeros(matPointNum, 2);
 counter = 0; % a counter used in defining coordinates of each material point
 
-for i = 1:NumofDiv_x
+for i = 1:numOfDivX
     for j = 1:NumofDiv_y
       coordx = -1/2*length + (dx/2) + (i - 1)*dx;
       coordy = -1/2*width + (dx/2) + (j - 1)*dx;
@@ -1159,8 +1182,8 @@ end
 coord = coord_excess(1:counter, :); %coord_excess is trimmed here once
 numOfRemoteMPs = counter;
 
-seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dxDense, center_hole);
-seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dxDense, center_hole);
+seedLeft = get_circle(left_tip.x_center, left_tip.y_center, left_tip.radius_major, dxDenseArea, center_hole);
+seedRight = get_circle(right_tip.x_center, right_tip.y_center, right_tip.radius_major, dxDenseArea, center_hole);
 coord = [coord; seedLeft; seedRight];
 totalNumMatPoint = size(coord, 1);
 
@@ -1177,7 +1200,7 @@ end
 for i = numOfRemoteMPs + 1: totalNumMatPoint
     coordx = coord(i, 1);
     coordy = coord(i, 2);
-    if (abs(coordy) <= dxDense && coordx >= 0 && coordy > 0)
+    if (abs(coordy) <= dxDenseArea && coordx >= 0 && coordy > 0)
         path(end+1) =i;
     end
 end
